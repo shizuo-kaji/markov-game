@@ -225,6 +225,7 @@ deploy_backend() {
   ]
 }
 EOF
+
         aws iam create-role --role-name "${EB_ROLE_NAME}" --assume-role-policy-document file://eb_trust_policy.json --region "${REGION}" || log_error "IAMロール ${EB_ROLE_NAME} の作成に失敗しました。"
         rm eb_trust_policy.json
 
@@ -242,7 +243,7 @@ EOF
     if ! aws iam get-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --region "${REGION}" > /dev/null 2>&1; then
         log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} を作成中..."
         aws iam create-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --region "${REGION}" || log_error "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} の作成に失敗しました。"
-        
+
         log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} にロール ${EB_ROLE_NAME} を追加中..."
         aws iam add-role-to-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --role-name "${EB_ROLE_NAME}" --region "${REGION}" || log_error "IAMインスタンスプロファイルへのロール追加に失敗しました。"
         sleep 10 # IAMの最終的な整合性を待つ
