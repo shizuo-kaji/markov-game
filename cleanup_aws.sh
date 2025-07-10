@@ -47,13 +47,13 @@ cleanup_resources() {
             UPDATED_CONFIG_CONTENT=$(echo "${DIST_CONFIG_JSON}" | jq '.DistributionConfig | .Enabled = false')
 
             # update-distribution コマンドにJSONを直接渡す
-            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG_CONTENT}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
+            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG_CONTENT}" --if-match "${ETAG}" --region "us-east-1" > /dev/null || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
 
             log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} が無効化されるまで待機中..."
             aws cloudfront wait distribution-deployed --id "${DISTRIBUTION_ID}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化待機中にエラーが発生しました。"
 
             log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除中..."
-            aws cloudfront delete-distribution --id "${DISTRIBUTION_ID}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの削除に失敗しました。"
+            aws cloudfront delete-distribution --id "${DISTRIBUTION_ID}" --if-match "${ETAG}" --region "us-east-1" || log_info "CloudFrontディストリビューションの削除に失敗しました。"
             log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除しました。"
         fi
     done
@@ -86,7 +86,7 @@ cleanup_resources() {
 
         for ENV_NAME in ${EB_ENVIRONMENTS}; do
             log_info "Elastic Beanstalk環境 ${ENV_NAME} を終了中..."
-            aws elasticbeanstalk terminate-environments --environment-name "${ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の終了に失敗しました。"
+            aws elasticbeanstalk terminate-environment --environment-name "${ENV_NAME}" --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の終了に失敗しました。"
             log_info "Elastic Beanstalk環境 ${ENV_NAME} が終了されるまで待機中..."
             aws elasticbeanstalk wait environment-terminated --environment-names "${ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の終了待機中にエラーが発生しました。"
             log_info "Elastic Beanstalk環境 ${ENV_NAME} を終了しました。"
