@@ -205,7 +205,7 @@ request_acm_certificate() {
     CERTIFICATE_ARN=$(aws acm request-certificate --domain-name "${PROJECT_NAME}.example.com" --validation-method DNS --query "CertificateArn" --output text --region "us-east-1") || log_error "ACM証明書のリクエストに失敗しました。"
     log_info "ACM証明書ARN: ${CERTIFICATE_ARN}"
     log_info "証明書が発行されるまで待機中... (DNS検証が必要です)"
-    aws acm wait certificate-issued --certificate-arn "${CERTIFICATE_ARN}" --region "us-east-1" || log_error "ACM証明書の発行待機中にエラーが発生しました。"
+    aws acm wait certificate-validated --certificate-arn "${CERTIFICATE_ARN}" --region "us-east-1" || log_error "ACM証明書の発行待機中にエラーが発生しました。"
     log_info "ACM証明書の発行完了。"
     echo "${CERTIFICATE_ARN}"
 }
