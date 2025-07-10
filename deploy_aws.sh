@@ -295,7 +295,6 @@ EOF
     log_info "使用するソリューションスタック: ${SOLUTION_STACK_NAME}"
     log_info "Tier設定: WebServer/Standard/1.0"
 
-    set -x # デバッグトレースを有効にする
     aws elasticbeanstalk create-environment \
         --application-name "${BACKEND_APP_NAME}" \
         --environment-name "${BACKEND_ENV_NAME}" \
@@ -310,11 +309,10 @@ EOF
             }
         ]' \
         --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
-    set +x # デバッグトレースを無効にする
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
-    aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" --delay 30 --max-attempts 40 || log_error "Elastic Beanstalk環境の待機中にエラーが発生しました。"
+    aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の待機中にエラーが発生しました。"
     aws elasticbeanstalk wait environment-ready --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の準備中にエラーが発生しました。"
     log_info "Elastic Beanstalk環境のデプロイ完了。"
 
