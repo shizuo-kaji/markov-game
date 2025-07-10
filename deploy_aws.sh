@@ -41,9 +41,13 @@ deploy_frontend() {
     log_info "--- フロントエンドのデプロイを開始します ---"
 
     log_info "1. Reactアプリケーションをビルドします..."
-    # frontendディレクトリに移動してnpmコマンドを実行
-    (cd frontend && npm install && npm run build) || log_error "Reactアプリケーションのビルドに失敗しました。"
-    log_info "ビルド完了。"
+    if [ -d "${FRONTEND_BUILD_DIR}" ]; then
+        log_info "ビルドディレクトリ (${FRONTEND_BUILD_DIR}) が存在するため、ビルドをスキップします。"
+    else
+        # frontendディレクトリに移動してnpmコマンドを実行
+        (cd frontend && npm install && npm run build) || log_error "Reactアプリケーションのビルドに失敗しました。"
+        log_info "ビルド完了。"
+    fi
 
     log_info "2. S3バケットを作成します: ${FRONTEND_BUCKET_NAME}"
     if [ "${REGION}" = "us-east-1" ]; then
@@ -225,7 +229,7 @@ EOF
 
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
     # 最新のPython 3.x on Amazon Linux 2/2023 を動的に取得
-    SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[?contains(@, `Python 3`) && contains(@, `64bit Amazon Linux`)].sort_by(@, &@)" --output text | tail -n 1)
+        SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[?contains(@, 'Python 3') && contains(@, '64bit Amazon Linux')].sort_by(@, &@)" --output text | tail -n 1)
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
