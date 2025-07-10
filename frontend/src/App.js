@@ -10,10 +10,10 @@ function App() {
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [newRoomName, setNewRoomName] = useState('');
-  const [newRoomPlayersN, setNewRoomPlayersN] = useState(2);
-  const [newRoomNonPlayerNodesM, setNewRoomNonPlayerNodesM] = useState(2);
-  const [newRoomPointsK, setNewRoomPointsK] = useState(10);
-  const [newRoomMaxTurnsS, setNewRoomMaxTurnsS] = useState(10);
+  const [newRoomPlayersN, setNewRoomPlayersN] = useState(4);
+  const [newRoomNonPlayerNodesM, setNewRoomNonPlayerNodesM] = useState(1);
+  const [newRoomPointsK, setNewRoomPointsK] = useState(5);
+  const [newRoomMaxTurnsS, setNewRoomMaxTurnsS] = useState(3);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -57,9 +57,34 @@ function App() {
     }
   };
 
+  const handleDeleteRoom = async (roomId) => {
+    if (window.confirm('Are you sure you want to delete this room?')) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/rooms/${roomId}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          fetchRooms(); // Refresh the room list
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to delete room.');
+        }
+      } catch (error) {
+        console.error('Error deleting room:', error);
+        alert('Error deleting room: ' + error.message);
+      }
+    }
+  };
+
   const handleSelectRoom = (room) => {
     fetch(`${API_BASE_URL}/rooms/${room.id}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          // If the room doesn't exist (404) or other error
+          throw new Error(`Room not found or error fetching room. Status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then(data => {
         // Ensure data.graph exists and has nodes/edges properties
         if (!data.graph) {
@@ -75,7 +100,12 @@ function App() {
         setSelectedRoom({ ...data }); // Pass mode along with room data
         console.log("Selected Room Data:", { ...data }); // Add this line
       })
-      .catch(err => console.error("Error fetching room details:", err));
+      .catch(err => {
+        console.error("Error fetching room details:", err);
+        alert("Failed to join the room. It might have been deleted. Returning to the lobby.");
+        fetchRooms(); // Refresh the room list
+        setSelectedRoom(null); // Go back to lobby view
+      });
   };
 
   if (selectedRoom) {
@@ -98,6 +128,7 @@ function App() {
                     {room.name} - <span>{room.description}</span>
                     <span> ({room.current_players_count}/{room.num_players_N} players)</span>
                     <button onClick={() => handleSelectRoom(room)}>Join</button>
+                    <button onClick={() => handleDeleteRoom(room.id)} className="delete-button">Delete</button>
                   </li>
                 ))}
               </ul>
@@ -118,7 +149,7 @@ function App() {
               </div>
 
               <div>
-                <label>Number of Players (N):</label>
+                <label>Number of Players:</label>
                 <input
                   type="number"
                   placeholder="Players (N)"
@@ -129,7 +160,7 @@ function App() {
                 />
               </div>
               <div>
-                <label>Number of Non-Player Nodes (M):</label>
+                <label>Number of Non-Player Nodes:</label>
                 <input
                   type="number"
                   placeholder="Non-Player Nodes (M)"
@@ -140,7 +171,7 @@ function App() {
                 />
               </div>
               <div>
-                <label>Points per Round (K):</label>
+                <label>Points per Round:</label>
                 <input
                   type="number"
                   placeholder="Points per Round (K)"
@@ -151,7 +182,7 @@ function App() {
                 />
               </div>
               <div>
-                <label>Max Turns (S):</label>
+                <label>Max Turns:</label>
                 <input
                   type="number"
                   placeholder="Max Turns (S)"
@@ -181,10 +212,24 @@ function GameRoom({ room, setRoom, onBack }) {
   const nodesDataSet = useRef(null);
   const edgesDataSet = useRef(null);
 
+  // Effect for initializing and updating the network.
   useEffect(() => {
     if (networkRef.current && room.graph) {
+      // If the network instance doesn't exist, create it.
       if (!visNetwork.current) {
-        nodesDataSet.current = new DataSet(room.graph.nodes.map(node => ({ id: node.id, label: String(node.id) })));
+        // Arrange nodes in a circle for initial layout.
+        const radius = room.graph.nodes.length * 40;
+        const nodesWithPositions = room.graph.nodes.map((node, index) => {
+          const angle = (index / room.graph.nodes.length) * 2 * Math.PI;
+          return {
+            id: node.id,
+            label: String(node.id),
+            x: radius * Math.cos(angle),
+            y: radius * Math.sin(angle),
+          };
+        });
+
+        nodesDataSet.current = new DataSet(nodesWithPositions);
         edgesDataSet.current = new DataSet(room.graph.edges.map(edge => ({ from: edge.source, to: edge.target, label: String(edge.weight) })));
 
         const data = {
@@ -194,48 +239,59 @@ function GameRoom({ room, setRoom, onBack }) {
 
         const options = {
           physics: {
-            enabled: false, // Disable physics simulation
-            stabilization: {
-              enabled: false // 安定化を無効にする
-            }
+            enabled: false,
           },
           edges: {
             arrows: 'to',
             smooth: {
               enabled: true,
-              type: "curvedCW", // エッジを曲線で表示
-              roundness: 0.15 // カーブの度合いを調整
+              type: "curvedCW",
+              roundness: 0.15
             }
           },
         };
+
         visNetwork.current = new Network(networkRef.current, data, options);
+
+        // Fit the view after the initial layout.
+        setTimeout(() => {
+            if (visNetwork.current) {
+                visNetwork.current.fit();
+            }
+        }, 100);
+      } else {
+        // If the network instance already exists, just update the data.
+        // Update nodes without changing their positions.
+        const newNodes = room.graph.nodes.map(node => {
+          const existingNode = nodesDataSet.current.get(node.id);
+          return { ...(existingNode || {}), id: node.id, label: String(node.id) };
+        });
+        nodesDataSet.current.update(newNodes);
+
+        // Update edges.
+        const newEdges = room.graph.edges.map(edge => ({
+          id: `${edge.source}-${edge.target}`,
+          from: edge.source,
+          to: edge.target,
+          label: String(edge.weight)
+        }));
+
+        const edgeIds = edgesDataSet.current.getIds();
+        edgesDataSet.current.remove(edgeIds);
+        edgesDataSet.current.add(newEdges);
       }
     }
+  }, [room.graph]); // This effect depends on room.graph for updates.
 
+  // This effect is ONLY for cleaning up the network when the component unmounts.
+  useEffect(() => {
     return () => {
       if (visNetwork.current) {
         visNetwork.current.destroy();
         visNetwork.current = null;
       }
     };
-  }, []); // Empty dependency array to run only once on mount
-
-  useEffect(() => {
-    if (nodesDataSet.current && edgesDataSet.current && room.graph) {
-      // Update nodes
-      const newNodes = room.graph.nodes.map(node => ({ id: node.id, label: String(node.id) }));
-      nodesDataSet.current.update(newNodes);
-
-      // Update edges
-      const newEdges = room.graph.edges.map(edge => ({
-        id: `${edge.source}-${edge.target}`,
-        from: edge.source,
-        to: edge.target,
-        label: String(edge.weight)
-      }));
-      edgesDataSet.current.update(newEdges);
-    }
-  }, [room.graph]); // Update data when room.graph changes
+  }, []); // Empty dependency array means this runs only on unmount.
 
   // WebSocket connection
   useEffect(() => {
@@ -250,7 +306,11 @@ function GameRoom({ room, setRoom, onBack }) {
       console.log('Received message:', message);
 
       if (message.type === 'move_submitted') {
-        setRoom({ ...message.room }); // Update room state with new submitted_moves_points
+        // Update only the submitted moves points, not the entire room object
+        setRoom(prevRoom => ({
+          ...prevRoom,
+          submitted_moves_points: message.room.submitted_moves_points
+        }));
       } else if (message.type === 'scores_calculated') {
         setRoom({ ...message.room }); // Update room state with new scores and graph
         alert('Scores calculated and turn advanced!');
@@ -259,6 +319,14 @@ function GameRoom({ room, setRoom, onBack }) {
         if (message.type === 'game_start') {
           alert('All players joined! Game started!');
         }
+      } else if (message.type === 'turn_reset') {
+        setRoom(message.room);
+        alert('The turn has been reset.');
+      } else if (message.type === 'game_over') {
+        const rankingText = message.ranking
+          .map((p, index) => `${index + 1}: ${p.name} (Score: ${p.score.toFixed(4)})`)
+          .join('\n');
+        alert(`Game Over!\n\nFinal Rankings:\n${rankingText}`);
       }
     };
 
@@ -293,7 +361,7 @@ function GameRoom({ room, setRoom, onBack }) {
         body: JSON.stringify(moveData),
       });
       if (response.ok) {
-        const submittedMove = await response.json();
+        // const submittedMove = await response.json();
         // alert(`Move submitted: ${submittedMove.player_id} changed ${submittedMove.source}-${submittedMove.target} by ${submittedMove.weight_change}`);
         // Optionally, update the room state to show submitted moves
       } else {
@@ -322,6 +390,23 @@ function GameRoom({ room, setRoom, onBack }) {
     } catch (error) {
       console.error("Error calculating scores:", error);
       alert("Error: " + error.message);
+    }
+  };
+
+  const handleResetTurn = async () => {
+    if (window.confirm('Are you sure you want to reset the current turn? All submitted moves in this turn will be lost.')) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/reset-turn`, {
+          method: 'POST',
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to reset turn.');
+        }
+      } catch (error) {
+        console.error("Error resetting turn:", error);
+        alert("Error: " + error.message);
+      }
     }
   };
 
@@ -371,6 +456,9 @@ function GameRoom({ room, setRoom, onBack }) {
                 <div className="calculate-scores-button-container">
                     <button onClick={handleCalculateScores} className="calculate-scores-button">
                         Calculate Scores & Next Turn
+                    </button>
+                    <button onClick={handleResetTurn} className="reset-turn-button">
+                        Reset Turn
                     </button>
                 </div>
             </div>

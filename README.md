@@ -68,6 +68,8 @@ uvicorn main:app --reload
 
 新しいターミナルを開き、プロジェクトのルートディレクトリに戻ってから実行します。
 
+frontend/.env の内容を，backend の URL に合わせて適宜編集してください．コメントアウトすると local 環境で動きます．
+
 ```bash
 cd ../frontend
 npm install

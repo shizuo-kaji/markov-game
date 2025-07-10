@@ -1,6 +1,3 @@
-# Exclude GEMINI.md
-GEMINI.md
-
 # Python virtual environment
 backend/venv/
 

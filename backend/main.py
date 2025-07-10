@@ -61,7 +61,7 @@ class Room(BaseModel):
     
     graph: Dict[str, Any] = {"nodes": [], "edges": []}
     moves: List[Move] = []
-    turn: int = 0
+    turn: int = 1
     submitted_moves_points: Dict[str, int] = {}
 
 # --- In-memory database ---
@@ -174,14 +174,19 @@ async def submit_move(room_id: str, move: Move):
 async def calculate_scores(room_id: str):
     room = get_room_safe(room_id)
 
-    # 1. Apply moves to the graph
-    print(f"Applying {len(room.moves)} moves to graph.")
+    # 1. Consolidate and apply moves to the graph
+    consolidated_moves: Dict[tuple[str, str], int] = {}
     for move in room.moves:
-        for edge in room.graph["edges"]:
-            if edge["source"] == move.source and edge["target"] == move.target:
-                # 重み変更を適用し、整数に丸める。最小値は0。
-                new_weight = int(edge["weight"] + move.weight_change)
-                edge["weight"] = max(0, new_weight)
+        edge_key = (move.source, move.target)
+        consolidated_moves[edge_key] = consolidated_moves.get(edge_key, 0) + move.weight_change
+
+    print(f"Applying consolidated moves: {consolidated_moves}")
+    for edge in room.graph["edges"]:
+        edge_key = (edge["source"], edge["target"])
+        if edge_key in consolidated_moves:
+            net_change = consolidated_moves[edge_key]
+            new_weight = int(edge["weight"] + net_change)
+            edge["weight"] = max(0, new_weight)
     print("Graph after moves:", room.graph)
 
     # 2. Create transition matrix
@@ -251,6 +256,41 @@ async def calculate_scores(room_id: str):
     else:
         await broadcast_message(room_id, {"type": "scores_calculated", "room": room.dict()})
     return room
+
+@app.post("/rooms/{room_id}/reset-turn", response_model=Room)
+async def reset_turn(room_id: str):
+    room = get_room_safe(room_id)
+
+    # Reset moves and points for the current turn
+    room.moves = []
+    room.submitted_moves_points = {}
+
+    print(f"Turn reset for room {room_id}")
+
+    # Broadcast the reset state to all clients in the room
+    await broadcast_message(room_id, {"type": "turn_reset", "room": room.dict()})
+
+    return room
+
+@app.delete("/rooms/{room_id}", status_code=204)
+async def delete_room(room_id: str):
+    if room_id not in rooms:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Notify clients in the room that it's being deleted
+    await broadcast_message(room_id, {"type": "room_deleted", "detail": "This room has been deleted by the host."})
+    
+    # Clean up connections
+    if room_id in connections:
+        for connection in connections[room_id]:
+            await connection.close(code=1000) # Normal closure
+        del connections[room_id]
+        
+    # Delete the room
+    del rooms[room_id]
+    return
+
+
 
 @app.websocket("/ws/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str):
