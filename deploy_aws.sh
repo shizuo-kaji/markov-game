@@ -304,9 +304,9 @@ EOF
         --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \
         --option-settings '[
             {
-            "Namespace": "aws:elasticbeanstalk:instance",
-            "OptionName": "InstanceProfile",
-            "Value": "aws-elasticbeanstalk-ec2-role"
+                "Namespace": "aws:autoscaling:launchconfiguration",
+                "OptionName": "IamInstanceProfile",
+                "Value": "aws-elasticbeanstalk-ec2-role"
             }
         ]' \
         --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
