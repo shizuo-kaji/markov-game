@@ -228,8 +228,9 @@ EOF
         --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションバージョンの作成に失敗しました。"
 
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
-    # 最新のPython 3.x on Amazon Linux 2/2023 を動的に取得
-        SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "sort(SolutionStacks[?contains(@, 'Python 3') && contains(@, '64bit Amazon Linux')])[-1]" --output text)
+    # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用)
+    SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[]" --output json | 
+        jq -r 'map(select(test("Python 3\.\d+") and test("64bit Amazon Linux"))) | sort | .[-1]')
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
@@ -294,6 +295,7 @@ main() {
     # 必要なコマンドの存在チェック
     check_command "npm"
     check_command "zip"
+    check_command "jq"
     check_aws_cli
 
     # AWSアカウントIDを取得 (Elastic BeanstalkのS3バケット名に使用)
