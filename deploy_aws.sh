@@ -46,13 +46,21 @@ deploy_frontend() {
     log_info "ビルド完了。"
 
     log_info "2. S3バケットを作成します: ${FRONTEND_BUCKET_NAME}"
-    aws s3api create-bucket --bucket "${FRONTEND_BUCKET_NAME}" --region "${REGION}" || log_error "S3バケットの作成に失敗しました。"
+    if [ "${REGION}" = "us-east-1" ]; then
+        aws s3api create-bucket --bucket "${FRONTEND_BUCKET_NAME}" --region "${REGION}" || log_error "S3バケットの作成に失敗しました。"
+    else
+        aws s3api create-bucket --bucket "${FRONTEND_BUCKET_NAME}" --region "${REGION}" --create-bucket-configuration LocationConstraint="${REGION}" || log_error "S3バケットの作成に失敗しました。"
+    fi
 
     log_info "3. S3バケットのパブリックアクセスブロック設定を無効にします..."
+    # 注意: アカウントレベルのS3パブリックアクセスブロック設定が有効な場合、
+    # このバケットレベルの設定はオーバーライドされます。その場合は、
+    # AWS S3コンソールでアカウントレベルの「パブリックポリシーをブロック」を無効にしてください。
     aws s3api put-public-access-block \
         --bucket "${FRONTEND_BUCKET_NAME}" \
         --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
         --region "${REGION}" || log_error "S3パブリックアクセスブロック設定の無効化に失敗しました。"
+    sleep 5 # 設定が反映されるのを待つための短い遅延
 
     log_info "4. S3バケットポリシーを設定します..."
     # バケットポリシーを一時ファイルに書き出し
@@ -81,91 +89,97 @@ EOF
     aws s3 sync "${FRONTEND_BUILD_DIR}" "s3://${FRONTEND_BUCKET_NAME}" --delete --region "${REGION}" || log_error "S3へのファイルアップロードに失敗しました。"
     log_info "S3へのアップロード完了。"
 
-    log_info "7. CloudFrontディストリビューションを作成します..."
+    log_info "6. CloudFrontディストリビューションを作成します..."
+
+    # CachingOptimizedポリシーIDを動的に取得
+    CACHING_OPTIMIZED_POLICY_ID=$(aws cloudfront list-cache-policies --query "CachePolicyList.Items[?CachePolicy.CachePolicyConfig.Name=='Managed-CachingOptimized'].CachePolicy.Id" --output text --region "us-east-1")
+    if [ -z "${CACHING_OPTIMIZED_POLICY_ID}" ]; then
+        log_error "Managed-CachingOptimizedキャッシュポリシーが見つかりませんでした。"
+    fi
+    log_info "Managed-CachingOptimizedポリシーID: ${CACHING_OPTIMIZED_POLICY_ID}"
+
     # S3静的ウェブサイトホスティングのエンドポイントを使用
     S3_WEBSITE_ENDPOINT="${FRONTEND_BUCKET_NAME}.s3-website.${REGION}.amazonaws.com"
     
     # CloudFrontディストリビューション設定を一時ファイルに書き出し
     cat <<EOF > cloudfront_config.json
 {
-    "DistributionConfig": {
-        "CallerReference": "$(date +%s)",
-        "Aliases": {
-            "Quantity": 0
-        },
-        "DefaultRootObject": "index.html",
-        "Origins": {
-            "Quantity": 1,
-            "Items": [
-                {
-                    "Id": "S3-Website-Origin",
-                    "DomainName": "${S3_WEBSITE_ENDPOINT}",
-                    "CustomHeaders": {
-                        "Quantity": 0
+    "CallerReference": "$(date +%s)",
+    "Aliases": {
+        "Quantity": 0
+    },
+    "DefaultRootObject": "index.html",
+    "Origins": {
+        "Quantity": 1,
+        "Items": [
+            {
+                "Id": "S3-Website-Origin",
+                "DomainName": "${S3_WEBSITE_ENDPOINT}",
+                "CustomHeaders": {
+                    "Quantity": 0
+                },
+                "OriginPath": "",
+                "CustomOriginConfig": {
+                    "HTTPPort": 80,
+                    "HTTPSPort": 443,
+                    "OriginProtocolPolicy": "http-only",
+                    "OriginSslProtocols": {
+                        "Quantity": 1,
+                        "Items": ["TLSv1.2"]
                     },
-                    "OriginPath": "",
-                    "CustomOriginConfig": {
-                        "HTTPPort": 80,
-                        "HTTPSPort": 443,
-                        "OriginProtocolPolicy": "http-only",
-                        "OriginSslProtocols": {
-                            "Quantity": 1,
-                            "Items": ["TLSv1.2"]
-                        },
-                        "OriginReadTimeout": 30,
-                        "OriginKeepaliveTimeout": 5
-                    }
+                    "OriginReadTimeout": 30,
+                    "OriginKeepaliveTimeout": 5
                 }
-            ]
-        },
-        "DefaultCacheBehavior": {
-            "TargetOriginId": "S3-Website-Origin",
-            "ViewerProtocolPolicy": "redirect-to-https",
-            "AllowedMethods": {
+            }
+        ]
+    },
+    "DefaultCacheBehavior": {
+        "TargetOriginId": "S3-Website-Origin",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["GET", "HEAD"],
+            "CachedMethods": {
                 "Quantity": 2,
-                "Items": ["GET", "HEAD"],
-                "CachedMethods": {
-                    "Quantity": 2,
-                    "Items": ["GET", "HEAD"]
-                }
-            },
-            "CachePolicyId": "658327ea-f89d-4c65-a139-56d6c4cb20f5", # CachingOptimizedポリシーID
-            "Compress": true,
-            "LambdaFunctionAssociations": {
-                "Quantity": 0
-            },
-            "FunctionAssociations": {
-                "Quantity": 0
-            },
-            "FieldLevelEncryptionId": ""
-        },
-        "CacheBehaviors": {
-            "Quantity": 0
-        },
-        "CustomErrorResponses": {
-            "Quantity": 1,
-            "Items": [
-                {
-                    "ErrorCode": 403,
-                    "ResponsePagePath": "/index.html",
-                    "ResponseCode": 200,
-                    "ErrorCachingMinTTL": 10
-                }
-            ]
-        },
-        "Comment": "Markov Game Frontend",
-        "Enabled": true,
-        "ViewerCertificate": {
-            "CloudFrontDefaultCertificate": true
-        },
-        "Restrictions": {
-            "GeoRestriction": {
-                "RestrictionType": "none",
-                "Quantity": 0
+                "Items": ["GET", "HEAD"]
             }
         },
-        "WebACLId": ""
-    }
+        "CachePolicyId": "${CACHING_OPTIMIZED_POLICY_ID}",
+        "Compress": true,
+        "LambdaFunctionAssociations": {
+            "Quantity": 0
+        },
+        "FunctionAssociations": {
+            "Quantity": 0
+        },
+        "FieldLevelEncryptionId": ""
+    },
+    "CacheBehaviors": {
+        "Quantity": 0
+    },
+    "CustomErrorResponses": {
+        "Quantity": 1,
+        "Items": [
+            {
+                "ErrorCode": 403,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 10
+            }
+        ]
+    },
+    "Comment": "Markov Game Frontend",
+    "Enabled": true,
+    "ViewerCertificate": {
+        "CloudFrontDefaultCertificate": true
+    },
+    "Restrictions": {
+        "GeoRestriction": {
+            "RestrictionType": "none",
+            "Quantity": 0
+        }
+    },
+    "WebACLId": ""
 }
 EOF
 
