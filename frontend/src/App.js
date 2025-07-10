@@ -238,7 +238,7 @@ function GameRoom({ room, setRoom, onBack }) {
 
   // WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/${room.id}`);
+    const ws = new WebSocket(`${API_BASE_URL.replace('http', 'ws')}/ws/${room.id}`);
 
     ws.onopen = () => {
       console.log('WebSocket connected');

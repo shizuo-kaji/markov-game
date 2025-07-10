@@ -50,6 +50,7 @@
 ```bash
 git clone https://github.com/shizuo-kaji/markov-game.git
 cd markov-game
+```
 
 ### 2. バックエンドのセットアップと起動
 

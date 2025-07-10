@@ -139,7 +139,7 @@ EOF
     },
     "DefaultCacheBehavior": {
         "TargetOriginId": "S3-Website-Origin",
-        "ViewerProtocolPolicy": "redirect-to-https",
+        "ViewerProtocolPolicy": "allow-all",
         "AllowedMethods": {
             "Quantity": 2,
             "Items": ["GET", "HEAD"],
@@ -319,40 +319,10 @@ EOF
     "Value": "/"
   },
   {
-    "Namespace": "aws:elasticbeanstalk:environment:loadbalancer:listener:443",
-    "OptionName": "ListenerEnabled",
-    "Value": "true"
-  },
-  {
-    "Namespace": "aws:elasticbeanstalk:environment:loadbalancer:listener:443",
-    "OptionName": "Protocol",
-    "Value": "HTTPS"
-  },
-  {
-    "Namespace": "aws:elasticbeanstalk:environment:loadbalancer:listener:443",
-    "OptionName": "InstancePort",
-    "Value": "80"
-  },
-  {
-    "Namespace": "aws:elasticbeanstalk:environment:loadbalancer:listener:443",
-    "OptionName": "InstanceProtocol",
-    "Value": "HTTP"
-  },
-  {
-    "Namespace": "aws:elasticbeanstalk:environment:loadbalancer:listener:443",
-    "OptionName": "SSLCertificateArns",
-    "Value": "${CERTIFICATE_ARN}"
-  },
-  {
-    "Namespace": "aws:elasticbeanstalk:application:environment",
-    "OptionName": "FRONTEND_URL",
-    "Value": "https://${CLOUDFRONT_DOMAIN_NAME}"
-  },
-    {
-        "Namespace": "aws:autoscaling:launchconfiguration",
-        "OptionName": "IamInstanceProfile",
-        "Value": "aws-elasticbeanstalk-ec2-role"
-    }
+    "Namespace": "aws:autoscaling:launchconfiguration",
+    "OptionName": "IamInstanceProfile",
+    "Value": "aws-elasticbeanstalk-ec2-role"
+  }
 ]
 EOF
 
@@ -373,7 +343,7 @@ log_error "Elastic Beanstalk環境の準備中にエラーが発生しました�
 
     # デプロイされた環境のURLを取得
     BACKEND_URL=$(aws elasticbeanstalk describe-environments --environment-names "${BACKEND_ENV_NAME}" --query 'Environments[0].CNAME' --output text --region "${REGION}") || log_error "バックエンドURLの取得に失敗しました。"
-    BACKEND_URL="https://${BACKEND_URL}" # CNAMEはhttps://を含まないため追加
+    BACKEND_URL="http://${BACKEND_URL}" # CNAMEはhttp://を含まないため追加
     log_info "バックエンドURL (Elastic Beanstalk): ${BACKEND_URL}"
 }
 
@@ -425,11 +395,8 @@ main() {
     # フロントエンドのデプロイを実行
     deploy_frontend
 
-    # ACM証明書をリクエスト
-    CERTIFICATE_ARN=$(request_acm_certificate)
-
     # バックエンドのデプロイを実行
-    deploy_backend "${CERTIFICATE_ARN}"
+    deploy_backend
 
     # フロントエンドとバックエンドの接続を更新し、再デプロイ
     update_frontend_connection

@@ -43,11 +43,11 @@ cleanup_resources() {
             DIST_CONFIG_JSON=$(aws cloudfront get-distribution-config --id "${DISTRIBUTION_ID}" --region "us-east-1")
             ETAG=$(echo "${DIST_CONFIG_JSON}" | jq -r '.ETag')
 
-            # Enabledをfalseに設定
-            UPDATED_CONFIG_JSON=$(echo "${DIST_CONFIG_JSON}" | jq '.DistributionConfig.Enabled = false')
+            # Enabledをfalseに設定し、DistributionConfigの内容のみを抽出
+            UPDATED_CONFIG_CONTENT=$(echo "${DIST_CONFIG_JSON}" | jq '.DistributionConfig | .Enabled = false')
 
             # update-distribution コマンドにJSONを直接渡す
-            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG_JSON}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
+            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG_CONTENT}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
 
             log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} が無効化されるまで待機中..."
             aws cloudfront wait distribution-deployed --id "${DISTRIBUTION_ID}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化待機中にエラーが発生しました。"
