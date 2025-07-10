@@ -301,7 +301,9 @@ EOF
         --environment-name "${BACKEND_ENV_NAME}" \
         --solution-stack-name "${SOLUTION_STACK_NAME}" \
         --version-label "${UNIQUE_ID}" \
-        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \n        --instance-profile "${EB_INSTANCE_PROFILE_ARN}" \n        --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
+        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \
+        --instance-profile "${EB_INSTANCE_PROFILE_ARN}" \
+        --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
