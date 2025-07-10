@@ -2,7 +2,7 @@
 
 # --- 設定変数 ---
 # デプロイするAWSリージョン。deploy_aws.sh と同じリージョンにしてください。
-REGION="ap-northeast-1" 
+REGION="ap-northeast-1"
 PROJECT_NAME="markov-game" # deploy_aws.sh と同じプロジェクト名にしてください。
 
 # --- ヘルパー関数 ---
@@ -75,29 +75,25 @@ cleanup_resources() {
 
     # --- Elastic Beanstalkアプリケーションと環境のクリーンアップ ---
     log_info "Elastic Beanstalkアプリケーションと環境を検索・削除します..."
-
-    # --- Elastic Beanstalkアプリケーションと環境のクリーンアップ ---
-    log_info "Elastic Beanstalkアプリケーションと環境を検索・削除します..."
-
     # アプリケーションを検索
     EB_APPLICATIONS=$(aws elasticbeanstalk describe-applications --query "Applications[?starts_with(ApplicationName, '${PROJECT_NAME}-backend-')].ApplicationName" --output text --region "${REGION}")
 
     for APP_NAME in ${EB_APPLICATIONS}; do
         log_info "Elastic Beanstalkアプリケーション ${APP_NAME} を処理中..."
-        
+
         # 環境を検索し、終了
         EB_ENVIRONMENTS=$(aws elasticbeanstalk describe-environments --application-name "${APP_NAME}" --query "Environments[].EnvironmentName" --output text --region "${REGION}")
-        
+
         for ENV_NAME in ${EB_ENVIRONMENTS}; do
             log_info "Elastic Beanstalk環境 ${ENV_NAME} を終了中..."
-            aws elasticbeanstalk terminate-environment --environment-name "${ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の終了に失敗しました。"
+            aws elasticbeanstalk terminate-environments --environment-name "${ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の終了に失敗しました。"
             log_info "Elastic Beanstalk環境 ${ENV_NAME} が終了されるまで待機中..."
             aws elasticbeanstalk wait environment-terminated --environment-names "${ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の終了待機中にエラーが発生しました。"
             log_info "Elastic Beanstalk環境 ${ENV_NAME} を終了しました。"
         done
 
         log_info "Elastic Beanstalkアプリケーション ${APP_NAME} を削除中..."
-        aws elasticbeanstalk delete-application --application-name "${APP_NAME}" --terminate-environments --delete-application-versions --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションの削除に失敗しました。"
+        aws elasticbeanstalk delete-application-versions --application-name "${APP_NAME}" --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションの削除に失敗しました。"
         log_info "Elastic Beanstalkアプリケーション ${APP_NAME} を削除しました。"
     done
 

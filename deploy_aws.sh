@@ -302,7 +302,6 @@ EOF
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
     log_info "使用するソリューションスタック: ${SOLUTION_STACK_NAME}"
-    log_info "Tier設定: WebServer/Standard/1.0"
 
     # Elastic Beanstalk環境のオプション設定
     # ロードバランサーをALBに変更し、HTTPSリスナーを設定
@@ -338,8 +337,7 @@ EOF
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
-        aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の待機中にエラーが発生しました。"
-log_error "Elastic Beanstalk環境の準備中にエラーが発生しました。"
+        aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_info "Elastic Beanstalk環境の待機中にエラーが発生しました。"
 
     # デプロイされた環境のURLを取得
     BACKEND_URL=$(aws elasticbeanstalk describe-environments --environment-names "${BACKEND_ENV_NAME}" --query 'Environments[0].CNAME' --output text --region "${REGION}") || log_error "バックエンドURLの取得に失敗しました。"
