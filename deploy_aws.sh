@@ -231,7 +231,7 @@ EOF
         log_info "IAMロール ${EB_ROLE_NAME} にポリシーをアタッチ中..."
         aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier" --region "${REGION}" || log_error "AWSElasticBeanstalkWebTier ポリシーのアタッチに失敗しました。"
         aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier" --region "${REGION}" || log_error "AWSElasticBeanstalkWorkerTier ポリシーのアタッチに失敗しました。"
-        aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdates" --region "${REGION}" || log_error "AWSElasticBeanstalkManagedUpdates ポリシーのアタッチに失敗しました。"
+        # aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdates" --region "${REGION}" || log_error "AWSElasticBeanstalkManagedUpdates ポリシーのアタッチに失敗しました。"
         aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AmazonS3FullAccess" --region "${REGION}" || log_error "AmazonS3FullAccess ポリシーのアタッチに失敗しました。"
         sleep 10 # IAMの最終的な整合性を待つ
     else
@@ -295,14 +295,22 @@ EOF
     log_info "使用するソリューションスタック: ${SOLUTION_STACK_NAME}"
     log_info "Tier設定: WebServer/Standard/1.0"
 
+    set -x # デバッグトレースを有効にする
     aws elasticbeanstalk create-environment \
         --application-name "${BACKEND_APP_NAME}" \
         --environment-name "${BACKEND_ENV_NAME}" \
         --solution-stack-name "${SOLUTION_STACK_NAME}" \
         --version-label "${UNIQUE_ID}" \
         --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \
-        --instance-profile "${EB_INSTANCE_PROFILE_ARN}" \
+        --option-settings '[
+            {
+            "Namespace": "aws:elasticbeanstalk:instance",
+            "OptionName": "InstanceProfile",
+            "Value": "aws-elasticbeanstalk-ec2-role"
+            }
+        ]' \
         --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
+    set +x # デバッグトレースを無効にする
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
