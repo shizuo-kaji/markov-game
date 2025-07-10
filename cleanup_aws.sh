@@ -41,11 +41,12 @@ cleanup_resources() {
         S3_WEBSITE_ENDPOINT="${BUCKET_NAME}.s3-website.${REGION}.amazonaws.com"
 
         # CloudFrontディストリビューションを検索 (S3ウェブサイトエンドポイントをオリジンとするもの)
-        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[?DomainName=='${S3_WEBSITE_ENDPOINT}']].Id" --output text --region "us-east-1") # CloudFrontはus-east-1で管理
+        # deploy_aws.shで設定したコメントで検索
+        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Comment=='Markov Game Frontend'].Id" --output text --region "us-east-1") # CloudFrontはus-east-1で管理
         
+        # 念のため、オリジンも確認
         if [ -z "${DISTRIBUTION_ID}" ]; then
-            # コメントで検索 (deploy_aws.shで設定したコメント)
-            DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Comment=='Markov Game Frontend'].Id" --output text --region "us-east-1")
+            DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[?DomainName=='${S3_WEBSITE_ENDPOINT}']].Id" --output text --region "us-east-1")
         fi
 
         if [ -n "${DISTRIBUTION_ID}" ]; then
@@ -79,6 +80,9 @@ cleanup_resources() {
     # --- Elastic Beanstalkアプリケーションと環境のクリーンアップ ---
     log_info "Elastic Beanstalkアプリケーションと環境を検索・削除します..."
 
+    # --- Elastic Beanstalkアプリケーションと環境のクリーンアップ ---
+    log_info "Elastic Beanstalkアプリケーションと環境を検索・削除します..."
+
     # アプリケーションを検索
     EB_APPLICATIONS=$(aws elasticbeanstalk describe-applications --query "Applications[?starts_with(ApplicationName, '${PROJECT_NAME}-backend-')].ApplicationName" --output text --region "${REGION}")
 
@@ -97,7 +101,7 @@ cleanup_resources() {
         done
 
         log_info "Elastic Beanstalkアプリケーション ${APP_NAME} を削除中..."
-        aws elasticbeanstalk delete-application --application-name "${APP_NAME}" --terminate-environments --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションの削除に失敗しました。"
+        aws elasticbeanstalk delete-application --application-name "${APP_NAME}" --terminate-environments --delete-application-versions --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションの削除に失敗しました。"
         log_info "Elastic Beanstalkアプリケーション ${APP_NAME} を削除しました。"
     done
 

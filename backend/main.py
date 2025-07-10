@@ -5,12 +5,15 @@ import uuid
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 
+import os
+
 app = FastAPI()
 
 # Add CORS middleware
+frontend_url = os.environ.get("FRONTEND_URL", "*") # Default to * for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=[frontend_url],  # Allows specific origin from environment variable
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -97,7 +100,7 @@ def create_room(room_data: RoomCreate):
     )
 
     player_nodes = [f"Player-{i+1}" for i in range(new_room.num_players_N)]
-    other_nodes = [f"item_{i+1}" for i in range(new_room.num_non_player_nodes_M)]
+    other_nodes = [f"neutral_{i+1}" for i in range(new_room.num_non_player_nodes_M)]
     nodes = player_nodes + other_nodes
 
     # Simple symmetric graph generation for initial setup
