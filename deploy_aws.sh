@@ -200,7 +200,65 @@ EOF
 
 # --- バックエンドデプロイ関数 ---
 deploy_backend() {
+    deploy_backend() {
     log_info "--- バックエンドのデプロイを開始します ---"
+
+    # IAMロールとインスタンスプロファイルの作成または確認
+    EB_ROLE_NAME="aws-elasticbeanstalk-ec2-role"
+    EB_INSTANCE_PROFILE_NAME="aws-elasticbeanstalk-ec2-role" # 通常、ロール名と同じ
+
+    # ロールが存在するか確認
+    if ! aws iam get-role --role-name "${EB_ROLE_NAME}" --region "${REGION}" > /dev/null 2>&1; then
+        log_info "IAMロール ${EB_ROLE_NAME} を作成中..."
+        # 信頼ポリシーを一時ファイルに書き出し
+        cat <<EOF > eb_trust_policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+        aws iam create-role --role-name "${EB_ROLE_NAME}" --assume-role-policy-document file://eb_trust_policy.json --region "${REGION}" || log_error "IAMロール ${EB_ROLE_NAME} の作成に失敗しました。"
+        rm eb_trust_policy.json
+
+        log_info "IAMロール ${EB_ROLE_NAME} にポリシーをアタッチ中..."
+        aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier" --region "${REGION}" || log_error "AWSElasticBeanstalkWebTier ポリシーのアタッチに失敗しました。"
+        aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier" --region "${REGION}" || log_error "AWSElasticBeanstalkWorkerTier ポリシーのアタッチに失敗しました。"
+        aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdates" --region "${REGION}" || log_error "AWSElasticBeanstalkManagedUpdates ポリシーのアタッチに失敗しました。"
+        aws iam attach-role-policy --role-name "${EB_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/AmazonS3FullAccess" --region "${REGION}" || log_error "AmazonS3FullAccess ポリシーのアタッチに失敗しました。"
+        sleep 10 # IAMの最終的な整合性を待つ
+    else
+        log_info "IAMロール ${EB_ROLE_NAME} は既に存在します。"
+    fi
+
+    # インスタンスプロファイルが存在するか確認
+    if ! aws iam get-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --region "${REGION}" > /dev/null 2>&1; then
+        log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} を作成中..."
+        aws iam create-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --region "${REGION}" || log_error "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} の作成に失敗しました。"
+        
+        log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} にロール ${EB_ROLE_NAME} を追加中..."
+        aws iam add-role-to-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --role-name "${EB_ROLE_NAME}" --region "${REGION}" || log_error "IAMインスタンスプロファイルへのロール追加に失敗しました。"
+        sleep 10 # IAMの最終的な整合性を待つ
+    else
+        log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} は既に存在します。"
+        # ロールがインスタンスプロファイルに関連付けられているか確認し、なければ追加
+        if ! aws iam get-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --query "InstanceProfile.Roles[?RoleName=='${EB_ROLE_NAME}']" --output text --region "${REGION}" > /dev/null 2>&1; then
+            log_info "IAMインスタンスプロファイル ${EB_INSTANCE_PROFILE_NAME} にロール ${EB_ROLE_NAME} を追加中..."
+            aws iam add-role-to-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --role-name "${EB_ROLE_NAME}" --region "${REGION}" || log_error "IAMインスタンスプロファイルへのロール追加に失敗しました。"
+            sleep 10
+        fi
+    fi
+
+    # Elastic BeanstalkのデフォルトインスタンスプロファイルのARNを取得
+    EB_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile --instance-profile-name "${EB_INSTANCE_PROFILE_NAME}" --query "InstanceProfile.Arn" --output text --region "${REGION}") || log_error "Elastic BeanstalkインスタンスプロファイルARNの取得に失敗しました。"
+    log_info "Elastic BeanstalkインスタンスプロファイルARN: ${EB_INSTANCE_PROFILE_ARN}"
 
     log_info "1. Elastic Beanstalk用のProcfileを作成します..."
     cat <<EOF > backend/Procfile
@@ -242,7 +300,7 @@ EOF
         --environment-name "${BACKEND_ENV_NAME}" \
         --solution-stack-name "${SOLUTION_STACK_NAME}" \
         --version-label "${UNIQUE_ID}" \
-        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}'         --instance-profile aws-elasticbeanstalk-ec2-role         --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
+        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}'         --instance-profile "${EB_INSTANCE_PROFILE_ARN}" \
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
