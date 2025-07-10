@@ -228,9 +228,9 @@ EOF
         --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションバージョンの作成に失敗しました。"
 
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
-    # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用し、Pythonバージョンでソート)
+    # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用し、Pythonバージョンを数値としてソート)
     SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[]" --output json | \
-        jq -r 'map(select(test("Python 3\\.\\d+") and test("64bit Amazon Linux"))) | sort_by(capture("Python (?<major>\\d+)\\.(?<minor>\\d+)")) | .[-1]')
+        jq -r 'map(select(test("Python 3\\.\\d+") and test("64bit Amazon Linux"))) | sort_by( [ (capture("Python (?<major>\\d+)\\.(?<minor>\\d+)") | .major | tonumber), (capture("Python (?<major>\\d+)\\.(?<minor>\\d+)") | .minor | tonumber) ] ) | .[-1]')
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
@@ -242,12 +242,11 @@ EOF
         --environment-name "${BACKEND_ENV_NAME}" \
         --solution-stack-name "${SOLUTION_STACK_NAME}" \
         --version-label "${UNIQUE_ID}" \
-        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \
-        --region "${REGION}" || log_error "Elastic Beanstalk環境の作成に失敗しました。"
+        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}'         --instance-profile aws-elasticbeanstalk-ec2-role         --region "${REGION}" > /dev/null || log_error "Elastic Beanstalk環境の作成に失敗しました。"
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
     # 環境が作成され、準備完了になるまで待機
-    aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の待機中にエラーが発生しました。"
+    aws elasticbeanstalk wait environment-exists --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" --delay 30 --max-attempts 40 || log_error "Elastic Beanstalk環境の待機中にエラーが発生しました。"
     aws elasticbeanstalk wait environment-ready --environment-names "${BACKEND_ENV_NAME}" --region "${REGION}" || log_error "Elastic Beanstalk環境の準備中にエラーが発生しました。"
     log_info "Elastic Beanstalk環境のデプロイ完了。"
 
