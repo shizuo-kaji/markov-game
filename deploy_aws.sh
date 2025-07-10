@@ -3,10 +3,10 @@
 # --- 設定変数 ---
 # デプロイするAWSリージョン。必要に応じて変更してください。
 # CloudShellが起動しているリージョンと合わせるのが一般的です。
-REGION="ap-northeast-1" 
+REGION="ap-northeast-1"
 PROJECT_NAME="markov-game"
 # グローバルで一意なIDを生成し、リソース名に付与します
-UNIQUE_ID=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8) 
+UNIQUE_ID=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)
 
 FRONTEND_BUCKET_NAME="${PROJECT_NAME}-frontend-${UNIQUE_ID}"
 CLOUDFRONT_DISTRIBUTION_ID="" # CloudFrontデプロイ後に設定されます
@@ -87,7 +87,7 @@ EOF
 
     log_info "5. S3バケットの静的ウェブサイトホスティングを設定します..."
     aws s3 website "s3://${FRONTEND_BUCKET_NAME}/" --index-document index.html --error-document index.html --region "${REGION}" || log_error "S3静的ウェブサイトホスティングの設定に失敗しました。"
-    
+
     log_info "6. ビルドファイルをS3にアップロードします..."
     # --delete オプションでS3バケットとローカルビルドディレクトリを同期
     aws s3 sync "${FRONTEND_BUILD_DIR}" "s3://${FRONTEND_BUCKET_NAME}" --delete --region "${REGION}" || log_error "S3へのファイルアップロードに失敗しました。"
@@ -104,7 +104,7 @@ EOF
 
     # S3静的ウェブサイトホスティングのエンドポイントを使用
     S3_WEBSITE_ENDPOINT="${FRONTEND_BUCKET_NAME}.s3-website.${REGION}.amazonaws.com"
-    
+
     # CloudFrontディストリビューション設定を一時ファイルに書き出し
     cat <<EOF > cloudfront_config.json
 {
@@ -191,7 +191,7 @@ EOF
     CLOUDFRONT_DISTRIBUTION_ID="${DISTRIBUTION_ID}"
     log_info "CloudFrontディストリビューションID: ${CLOUDFRONT_DISTRIBUTION_ID}"
     log_info "CloudFrontディストリビューションがデプロイされるまで数分かかります。ステータスを確認してください。"
-    
+
     # CloudFrontのURLを取得
     CLOUDFRONT_DOMAIN_NAME=$(aws cloudfront get-distribution --id "${CLOUDFRONT_DISTRIBUTION_ID}" --region "${REGION}" --query 'Distribution.DomainName' --output text)
     log_info "フロントエンドURL (CloudFront): https://${CLOUDFRONT_DOMAIN_NAME}"
@@ -219,7 +219,7 @@ EOF
     log_info "4. アプリケーションバージョンをS3にアップロードします..."
     # Elastic Beanstalkが使用するS3バケットにアップロード
     aws s3 cp "${BACKEND_ZIP_FILE}" "s3://elasticbeanstalk-${REGION}-${AWS_ACCOUNT_ID}/${BACKEND_SOURCE_BUNDLE_KEY}" --region "${REGION}" || log_error "アプリケーションバージョンのS3アップロードに失敗しました。"
-    
+
     log_info "5. Elastic Beanstalkアプリケーションバージョンを作成します..."
     aws elasticbeanstalk create-application-version \
         --application-name "${BACKEND_APP_NAME}" \
@@ -228,9 +228,9 @@ EOF
         --region "${REGION}" || log_error "Elastic Beanstalkアプリケーションバージョンの作成に失敗しました。"
 
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
-    # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用)
-    SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[]" --output json | 
-        jq -r 'map(select(test("Python 3\.\d+") and test("64bit Amazon Linux"))) | sort | .[-1]')
+    # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用し、Pythonバージョンでソート)
+    SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[]" --output json | \
+        jq -r 'map(select(test("Python 3\\.\\d+") and test("64bit Amazon Linux"))) | sort_by(capture("Python (?<major>\\d+)\\.(?<minor>\\d+)")) | .[-1]')
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
@@ -242,7 +242,7 @@ EOF
         --environment-name "${BACKEND_ENV_NAME}" \
         --solution-stack-name "${SOLUTION_STACK_NAME}" \
         --version-label "${UNIQUE_ID}" \
-        --tier "WebServer/Standard/1.0" \
+        --tier '{"Name":"WebServer","Type":"Standard","Version":"1.0"}' \
         --region "${REGION}" || log_error "Elastic Beanstalk環境の作成に失敗しました。"
 
     log_info "Elastic Beanstalk環境がデプロイされるまでお待ちください。これには数分かかります..."
