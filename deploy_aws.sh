@@ -6,7 +6,7 @@
 REGION="ap-northeast-1"
 PROJECT_NAME="markov-game"
 # グローバルで一意なIDを生成し、リソース名に付与します
-UNIQUE_ID=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)
+UNIQUE_ID=$(LC_ALL=C head /dev/urandom | tr -dc a-z0-9 | head -c 8)
 
 FRONTEND_BUCKET_NAME="${PROJECT_NAME}-frontend-${UNIQUE_ID}"
 CLOUDFRONT_DISTRIBUTION_ID="" # CloudFrontデプロイ後に設定されます
@@ -200,7 +200,6 @@ EOF
 
 # --- バックエンドデプロイ関数 ---
 deploy_backend() {
-    deploy_backend() {
     log_info "--- バックエンドのデプロイを開始します ---"
 
     # IAMロールとインスタンスプロファイルの作成または確認
