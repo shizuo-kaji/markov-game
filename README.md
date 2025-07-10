@@ -94,6 +94,10 @@ http://localhost:3000/
 ### デプロイ手順
 
 1.  **CloudShell を起動**し、プロジェクトのルートディレクトリに移動します。
+    ```bash
+    git clone git clone https://github.com/shizuo-kaji/markov-game
+    cd markov-game
+    ```
 2.  以下のコマンドでデプロイスクリプトに実行権限を付与します。
     ```bash
     chmod +x deploy_aws.sh

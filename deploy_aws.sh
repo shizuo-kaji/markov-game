@@ -46,9 +46,15 @@ deploy_frontend() {
     log_info "ビルド完了。"
 
     log_info "2. S3バケットを作成します: ${FRONTEND_BUCKET_NAME}"
-    aws s3 mb "s3://${FRONTEND_BUCKET_NAME}" --region "${REGION}" || log_error "S3バケットの作成に失敗しました。"
+    aws s3api create-bucket --bucket "${FRONTEND_BUCKET_NAME}" --region "${REGION}" || log_error "S3バケットの作成に失敗しました。"
 
-    log_info "3. S3バケットポリシーを設定します..."
+    log_info "3. S3バケットのパブリックアクセスブロック設定を無効にします..."
+    aws s3api put-public-access-block \
+        --bucket "${FRONTEND_BUCKET_NAME}" \
+        --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
+        --region "${REGION}" || log_error "S3パブリックアクセスブロック設定の無効化に失敗しました。"
+
+    log_info "4. S3バケットポリシーを設定します..."
     # バケットポリシーを一時ファイルに書き出し
     cat <<EOF > s3_bucket_policy.json
 {
@@ -67,15 +73,15 @@ EOF
     aws s3api put-bucket-policy --bucket "${FRONTEND_BUCKET_NAME}" --policy file://s3_bucket_policy.json --region "${REGION}" || log_error "S3バケットポリシーの設定に失敗しました。"
     rm s3_bucket_policy.json # 一時ファイルを削除
 
-    log_info "4. S3バケットの静的ウェブサイトホスティングを設定します..."
+    log_info "5. S3バケットの静的ウェブサイトホスティングを設定します..."
     aws s3 website "s3://${FRONTEND_BUCKET_NAME}/" --index-document index.html --error-document index.html --region "${REGION}" || log_error "S3静的ウェブサイトホスティングの設定に失敗しました。"
     
-    log_info "5. ビルドファイルをS3にアップロードします..."
+    log_info "6. ビルドファイルをS3にアップロードします..."
     # --delete オプションでS3バケットとローカルビルドディレクトリを同期
     aws s3 sync "${FRONTEND_BUILD_DIR}" "s3://${FRONTEND_BUCKET_NAME}" --delete --region "${REGION}" || log_error "S3へのファイルアップロードに失敗しました。"
     log_info "S3へのアップロード完了。"
 
-    log_info "6. CloudFrontディストリビューションを作成します..."
+    log_info "7. CloudFrontディストリビューションを作成します..."
     # S3静的ウェブサイトホスティングのエンドポイントを使用
     S3_WEBSITE_ENDPOINT="${FRONTEND_BUCKET_NAME}.s3-website.${REGION}.amazonaws.com"
     
@@ -237,7 +243,7 @@ update_frontend_connection() {
 
     if [ -z "${BACKEND_URL}" ]; then
         log_error "バックエンドURLが取得できませんでした。フロントエンドの更新をスキップします。"
-    }
+    fi
 
     log_info "1. frontend/src/App.js の API_BASE_URL を更新します..."
     # sed -i はmacOSとLinuxで挙動が異なるため、CloudShell (Linux) 向けに直接編集
@@ -255,7 +261,7 @@ update_frontend_connection() {
 
     if [ -z "${CLOUDFRONT_DISTRIBUTION_ID}" ]; then
         log_error "CloudFrontディストリビューションIDが取得できませんでした。キャッシュの無効化をスキップします。"
-    }
+    fi
 
     log_info "4. CloudFrontキャッシュを無効化します..."
     aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*" --region "${REGION}" || log_error "CloudFrontキャッシュの無効化に失敗しました。"
