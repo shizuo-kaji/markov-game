@@ -1,0 +1,20 @@
+# Exclude GEMINI.md
+GEMINI.md
+
+# Python virtual environment
+backend/venv/
+
+# Python cache directories
+backend/__pycache__/
+
+# Node modules
+node_modules/
+
+# Build output
+build/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
