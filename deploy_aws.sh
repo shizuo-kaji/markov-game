@@ -301,7 +301,7 @@ EOF
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
     # 最新のPython 3.x on Amazon Linux を動的に取得 (jqを使用し、Pythonバージョンを数値としてソート)
     SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "SolutionStacks[]" --output json |
-        jq -r 'map(select(test("Python 3\.\d+") and test("64bit Amazon Linux"))) | sort_by( [ (capture("Python (?<major>\d+)\.(?<minor>\d+)") | .major | tonumber), (capture("Python (?<major>\d+)\.(?<minor>\d+)") | .minor | tonumber) ] ) | .[-1]')
+        jq -r 'map(select(test("Python 3\\.\\d+") and test("64bit Amazon Linux"))) | sort_by( [ (capture("Python (?<major>\\d+)\\.(?<minor>\\d+)") | .major | tonumber), (capture("Python (?<major>\\d+)\\.(?<minor>\\d+)") | .minor | tonumber) ] ) | .[-1]')
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi

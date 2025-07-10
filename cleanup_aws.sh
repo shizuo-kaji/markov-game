@@ -30,48 +30,44 @@ cleanup_resources() {
     AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) || log_error "AWSアカウントIDの取得に失敗しました。"
     log_info "AWSアカウントID: ${AWS_ACCOUNT_ID}"
 
-    # --- CloudFrontディストリビューションとS3バケットのクリーンアップ ---
-    log_info "CloudFrontディストリビューションとS3バケットを検索・削除します..."
-    
+    # --- CloudFrontディストリビューションのクリーンアップ ---
+    log_info "CloudFrontディストリビューションを検索・削除します..."
+
+    # コメントで検索
+    CF_DISTRIBUTIONS=$(aws cloudfront list-distributions --query "DistributionList.Items[?Comment=='Markov Game Frontend'].Id" --output text --region "us-east-1")
+
+    for DISTRIBUTION_ID in ${CF_DISTRIBUTIONS}; do
+        if [ -n "${DISTRIBUTION_ID}" ]; then
+            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を無効化中..."
+            # ディストリビューションの現在の設定を取得
+            DIST_CONFIG_JSON=$(aws cloudfront get-distribution-config --id "${DISTRIBUTION_ID}" --region "us-east-1")
+            ETAG=$(echo "${DIST_CONFIG_JSON}" | jq -r '.ETag')
+
+            # Enabledをfalseに設定
+            UPDATED_CONFIG_JSON=$(echo "${DIST_CONFIG_JSON}" | jq '.DistributionConfig.Enabled = false')
+
+            # update-distribution コマンドにJSONを直接渡す
+            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG_JSON}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
+
+            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} が無効化されるまで待機中..."
+            aws cloudfront wait distribution-deployed --id "${DISTRIBUTION_ID}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化待機中にエラーが発生しました。"
+
+            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除中..."
+            aws cloudfront delete-distribution --id "${DISTRIBUTION_ID}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの削除に失敗しました。"
+            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除しました。"
+        fi
+    done
+
+    # --- S3バケットのクリーンアップ (CloudFrontとは独立して処理) ---
+    log_info "S3バケットを検索・削除します..."
     # フロントエンドS3バケットを検索
     FRONTEND_BUCKETS=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '${PROJECT_NAME}-frontend-')].Name" --output text --region "${REGION}")
 
     for BUCKET_NAME in ${FRONTEND_BUCKETS}; do
         log_info "S3バケット ${BUCKET_NAME} を処理中..."
-        S3_WEBSITE_ENDPOINT="${BUCKET_NAME}.s3-website.${REGION}.amazonaws.com"
-
-        # CloudFrontディストリビューションを検索 (S3ウェブサイトエンドポイントをオリジンとするもの)
-        # deploy_aws.shで設定したコメントで検索
-        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Comment=='Markov Game Frontend'].Id" --output text --region "us-east-1") # CloudFrontはus-east-1で管理
-        
-        # 念のため、オリジンも確認
-        if [ -z "${DISTRIBUTION_ID}" ]; then
-            DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[?DomainName=='${S3_WEBSITE_ENDPOINT}']].Id" --output text --region "us-east-1")
-        fi
-
-        if [ -n "${DISTRIBUTION_ID}" ]; then
-            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を無効化中..."
-            # ディストリビューションの現在の設定を取得
-            DIST_CONFIG=$(aws cloudfront get-distribution-config --id "${DISTRIBUTION_ID}" --region "us-east-1")
-            ETAG=$(echo "${DIST_CONFIG}" | jq -r '.ETag')
-            
-            # Enabledをfalseに設定して更新
-            UPDATED_CONFIG=$(echo "${DIST_CONFIG}" | jq '.DistributionConfig.Enabled = false')
-            aws cloudfront update-distribution --id "${DISTRIBUTION_ID}" --distribution-config "${UPDATED_CONFIG}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化に失敗しました。"
-            
-            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} が無効化されるまで待機中..."
-            aws cloudfront wait distribution-deployed --id "${DISTRIBUTION_ID}" --region "us-east-1" || log_error "CloudFrontディストリビューションの無効化待機中にエラーが発生しました。"
-            
-            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除中..."
-            aws cloudfront delete-distribution --id "${DISTRIBUTION_ID}" --if-match "${ETAG}" --region "us-east-1" || log_error "CloudFrontディストリビューションの削除に失敗しました。"
-            log_info "CloudFrontディストリビューション ${DISTRIBUTION_ID} を削除しました。"
-        else
-            log_info "S3バケット ${BUCKET_NAME} に関連するCloudFrontディストリビューションは見つかりませんでした。"
-        fi
-
         log_info "S3バケット ${BUCKET_NAME} の内容を空にしています..."
         aws s3 rm "s3://${BUCKET_NAME}/" --recursive --region "${REGION}" || log_error "S3バケットの内容の削除に失敗しました。"
-        
+
         log_info "S3バケット ${BUCKET_NAME} を削除中..."
         aws s3 rb "s3://${BUCKET_NAME}/" --force --region "${REGION}" || log_error "S3バケットの削除に失敗しました。"
         log_info "S3バケット ${BUCKET_NAME} を削除しました。"
