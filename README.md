@@ -86,6 +86,35 @@ npm start
 http://localhost:3000/
 ```
 
+## Render.com でのデプロイ (推奨)
+
+このプロジェクトは、[Render.com](https://render.com/) を利用して簡単にデプロイできます。フロントエンドは「Static Site」、バックエンドは「Web Service」としてデプロイすることを推奨します。GitHubリポジトリを連携させることで、自動デプロイも設定可能です。
+
+### 1. バックエンドのデプロイ (Web Service)
+
+1.  Renderダッシュボードで「New +」 > 「Web Service」を選択し、このGitHubリポジトリを選択します。
+2.  以下の設定を行います。
+    - **Root Directory**: `backend`
+    - **Environment**: `Python 3`
+    - **Build Command**: `pip install -r requirements.txt`
+    - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+3.  「Create Web Service」をクリックしてデプロイします。
+4.  デプロイが完了したら、発行された `.onrender.com` のURLを控えておきます。
+
+### 2. フロントエンドのデプロイ (Static Site)
+
+1.  Renderダッシュボードで「New +」 > 「Static Site」を選択し、再度このGitHubリポジトリを選択します。
+2.  以下の設定を行います。
+    - **Root Directory**: `frontend`
+    - **Build Command**: `npm install && npm run build`
+    - **Publish Directory**: `build`
+3.  「Advanced」を開き、環境変数を追加します。
+    - **Key**: `REACT_APP_BACKEND_URL`
+    - **Value**: 先ほど控えたバックエンドのURL
+4.  「Create Static Site」をクリックしてデプロイします。
+
+これで、フロントエンドとバックエンドが連携して動作します。
+
 ## AWS デプロイ
 
 このプロジェクトは、AWS CloudShell を使用して簡単に AWS にデプロイできます。デプロイスクリプトは、フロントエンドを Amazon S3 + CloudFront に、バックエンドを AWS Elastic Beanstalk にデプロイします。

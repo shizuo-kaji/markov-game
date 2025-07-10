@@ -9,7 +9,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 function App() {
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomName, setNewRoomName] = useState('Test Room');
   const [newRoomPlayersN, setNewRoomPlayersN] = useState(4);
   const [newRoomNonPlayerNodesM, setNewRoomNonPlayerNodesM] = useState(1);
   const [newRoomPointsK, setNewRoomPointsK] = useState(5);
@@ -76,17 +76,21 @@ function App() {
     }
   };
 
-  const handleSelectRoom = (room) => {
+  const [selectedPlayerId, setSelectedPlayerId] = useState('');
+
+  const handleSelectRoom = (room, playerId) => {
+    if (!playerId) {
+      alert('Please select a player to join as.');
+      return;
+    }
     fetch(`${API_BASE_URL}/rooms/${room.id}`)
       .then(res => {
         if (!res.ok) {
-          // If the room doesn't exist (404) or other error
           throw new Error(`Room not found or error fetching room. Status: ${res.status}`);
         }
         return res.json();
       })
       .then(data => {
-        // Ensure data.graph exists and has nodes/edges properties
         if (!data.graph) {
           data.graph = { nodes: [], edges: [] };
         } else {
@@ -97,14 +101,14 @@ function App() {
             data.graph.edges = [];
           }
         }
-        setSelectedRoom({ ...data }); // Pass mode along with room data
-        console.log("Selected Room Data:", { ...data }); // Add this line
+        setSelectedRoom({ ...data, mode: { player_id: playerId } });
+        console.log("Selected Room Data:", { ...data, mode: { player_id: playerId } });
       })
       .catch(err => {
         console.error("Error fetching room details:", err);
         alert("Failed to join the room. It might have been deleted. Returning to the lobby.");
-        fetchRooms(); // Refresh the room list
-        setSelectedRoom(null); // Go back to lobby view
+        fetchRooms();
+        setSelectedRoom(null);
       });
   };
 
@@ -126,8 +130,14 @@ function App() {
                 {rooms.map(room => (
                   <li key={room.id}>
                     {room.name} - <span>{room.description}</span>
-                    <span> ({room.current_players_count}/{room.num_players_N} players)</span>
-                    <button onClick={() => handleSelectRoom(room)}>Join</button>
+                    <span> ({room.num_players_N} players)</span>
+                    <select onChange={(e) => setSelectedPlayerId(e.target.value)} defaultValue="">
+                      <option value="" disabled>Select Player</option>
+                      {Array.from({ length: room.num_players_N }, (_, i) => (
+                        <option key={`Player-${i+1}`} value={i}>Player-{i+1}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => handleSelectRoom(room, selectedPlayerId)}>Join</button>
                     <button onClick={() => handleDeleteRoom(room.id)} className="delete-button">Delete</button>
                   </li>
                 ))}
@@ -201,8 +211,10 @@ function App() {
   );
 }
 
-function GameRoom({ room, setRoom, onBack }) {
-  const [movePlayerId, setMovePlayerId] = useState(room.players && room.players.length > 0 ? room.players[0].id : '');
+function GameRoom({ room, setRoom, onBack, mode }) {
+  const player_id = mode?.player_id || room.player_id || '';
+  const selected_player = room?.players?.[player_id]?.name || ''
+  const movePlayerId = room?.players?.[player_id]?.id || (room.players && room.players.length > 0 ? room.players[0].id : '');
   const [moveSource, setMoveSource] = useState(room.graph.nodes && room.graph.nodes.length > 0 ? room.graph.nodes[0].id : '');
   const [moveTarget, setMoveTarget] = useState(room.graph.nodes && room.graph.nodes.length > 1 ? room.graph.nodes[1].id : '');
   const [moveWeight, setMoveWeight] = useState(1);
@@ -415,31 +427,36 @@ function GameRoom({ room, setRoom, onBack }) {
        <header className="App-header">
         <button onClick={onBack} style={{position: 'absolute', top: 10, left: 10}}>Back to Lobby</button>
         <h2>{room.name}</h2>
-        <p>Players: {room.players.length} / {room.num_players_N}</p>
-
         <div className="game-layout">
             <div id="mynetwork" ref={networkRef} className="graph-container"></div>
             <div className="control-panel">
                 <h3>Turn: {room.turn} / {room.max_turns_S}</h3>
                 <h3>Players</h3>
-                <ul>
-                    {room.players && room.players.map(p => {
-                        const pointsSpent = room.submitted_moves_points[p.id] || 0;
-                        const remainingPoints = room.points_per_round_K - pointsSpent;
-                        return (
-                            <li key={p.id}>
-                                {p.name} (Score: {p.score.toFixed(4)}) (Points: {remainingPoints}/{room.points_per_round_K})
-                            </li>
-                        );
-                    })}
-                </ul>
+                <table className="players-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th>Score</th>
+                            <th>Points</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {room.players && room.players.map(p => {
+                            const pointsSpent = room.submitted_moves_points[p.id] || 0;
+                            const remainingPoints = room.points_per_round_K - pointsSpent;
+                            return (
+                                <tr key={p.id}>
+                                    <td>{p.name}</td>
+                                    <td>{p.score.toFixed(4)}</td>
+                                    <td>{remainingPoints}/{room.points_per_round_K}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
                 <div className="move-submission">
-                    <h3>Submit Move</h3>
+                    <h3>Submit Move for {selected_player || 'No player selected'}</h3>
                     <form onSubmit={handleSubmitMove}>
-                        <label>Player:</label>
-                        <select value={movePlayerId} onChange={e => setMovePlayerId(e.target.value)}>
-                            {room.players && room.players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
                         <label>Source:</label>
                         <select value={moveSource} onChange={e => setMoveSource(e.target.value)}>
                             {room.graph.nodes && room.graph.nodes.map(n => <option key={n.id} value={n.id}>{n.id}</option>)}

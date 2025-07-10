@@ -159,7 +159,7 @@ async def submit_move(room_id: str, move: Move):
         raise HTTPException(status_code=404, detail="Player not found in this room")
 
     points_spent = abs(move.weight_change)
-    current_points_spent = room.submitted_moves_points.get(move.player_id, 0)
+    current_points_spent = room.submitted_moves_points.get(move.player_id, 0);
 
     if current_points_spent + points_spent > room.points_per_round_K:
         raise HTTPException(status_code=400, detail=f"Player {move.player_id} has exceeded their points limit for this round. Remaining: {room.points_per_round_K}")
