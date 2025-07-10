@@ -3,7 +3,8 @@ import { Network } from 'vis-network';
 import { DataSet } from 'vis-data';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:8000';
+//const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 function App() {
   const [rooms, setRooms] = useState([]);
@@ -115,7 +116,7 @@ function App() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label>Number of Players (N):</label>
                 <input
@@ -274,7 +275,7 @@ function GameRoom({ room, setRoom, onBack }) {
     };
   }, [room.id, setRoom]); // Reconnect if room.id changes
 
-  
+
 
   const handleSubmitMove = async (e) => {
     e.preventDefault();
