@@ -200,7 +200,6 @@ EOF
 
 # --- バックエンドデプロイ関数 ---
 deploy_backend() {
-    set -x # デバッグトレースを有効にする
     log_info "--- バックエンドのデプロイを開始します ---"
 
     log_info "1. Elastic Beanstalk用のProcfileを作成します..."
@@ -230,7 +229,7 @@ EOF
 
     log_info "6. Elastic Beanstalk環境を作成します: ${BACKEND_ENV_NAME}"
     # 最新のPython 3.x on Amazon Linux 2/2023 を動的に取得
-        SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "sort(SolutionStacks[?contains(@, 'Python 3') && contains(@, '64bit Amazon Linux')])" --output text | tail -n 1)
+        SOLUTION_STACK_NAME=$(aws elasticbeanstalk list-available-solution-stacks --region "${REGION}" --query "sort(SolutionStacks[?contains(@, 'Python 3') && contains(@, '64bit Amazon Linux')])[-1]" --output text)
     if [ -z "${SOLUTION_STACK_NAME}" ]; then
         log_error "適切なPythonソリューションスタックが見つかりませんでした。"
     fi
