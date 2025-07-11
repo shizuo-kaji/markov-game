@@ -48,6 +48,9 @@ class Move(BaseModel):
     target: str
     weight_change: int
 
+class ResetMovesRequest(BaseModel):
+    player_id: str
+
 class Room(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -257,18 +260,21 @@ async def calculate_scores(room_id: str):
         await broadcast_message(room_id, {"type": "scores_calculated", "room": room.dict()})
     return room
 
-@app.post("/rooms/{room_id}/reset-turn", response_model=Room)
-async def reset_turn(room_id: str):
+@app.post("/rooms/{room_id}/reset-moves", response_model=Room)
+async def reset_moves(room_id: str, request: ResetMovesRequest):
     room = get_room_safe(room_id)
 
-    # Reset moves and points for the current turn
-    room.moves = []
-    room.submitted_moves_points = {}
+    # Filter out moves by the specified player
+    room.moves = [move for move in room.moves if move.player_id != request.player_id]
 
-    print(f"Turn reset for room {room_id}")
+    # Reset submitted points for the specified player
+    if request.player_id in room.submitted_moves_points:
+        room.submitted_moves_points[request.player_id] = 0
 
-    # Broadcast the reset state to all clients in the room
-    await broadcast_message(room_id, {"type": "turn_reset", "room": room.dict()})
+    print(f"Moves reset for player {request.player_id} in room {room_id}")
+
+    # Broadcast the updated room state to all clients in the room
+    await broadcast_message(room_id, {"type": "moves_reset", "room": room.dict()})
 
     return room
 

@@ -129,7 +129,7 @@ function App() {
               <ul>
                 {rooms.map(room => (
                   <li key={room.id}>
-                    {room.name} - <span>{room.description}</span>
+                    {room.name} <span>{room.description}</span>
                     <span> ({room.num_players_N} players)</span>
                     <select onChange={(e) => setSelectedPlayerId(e.target.value)} defaultValue="">
                       <option value="" disabled>Select Player</option>
@@ -207,12 +207,15 @@ function App() {
           </div>
         </div>
       </header>
+      <footer>
+          <p><a href="https://github.com/shizuo-kaji/markov-game/" target="_blank" rel="noopener noreferrer">Rules & Codes</a></p>
+      </footer>
     </div>
   );
 }
 
 function GameRoom({ room, setRoom, onBack, mode }) {
-  const player_id = mode?.player_id || room.player_id || '';
+  const player_id = room?.player_id || mode?.player_id || '';
   const selected_player = room?.players?.[player_id]?.name || ''
   const movePlayerId = room?.players?.[player_id]?.id || (room.players && room.players.length > 0 ? room.players[0].id : '');
   const [moveSource, setMoveSource] = useState(room.graph.nodes && room.graph.nodes.length > 0 ? room.graph.nodes[0].id : '');
@@ -324,16 +327,22 @@ function GameRoom({ room, setRoom, onBack, mode }) {
           submitted_moves_points: message.room.submitted_moves_points
         }));
       } else if (message.type === 'scores_calculated') {
-        setRoom({ ...message.room }); // Update room state with new scores and graph
+        // Preserve the selected player_id when updating room state
+        setRoom(prevRoom => ({
+          ...message.room,
+          mode: { player_id: prevRoom.mode?.player_id || mode?.player_id }
+        }));
         alert('Scores calculated and turn advanced!');
       } else if (message.type === 'player_joined' || message.type === 'game_start') {
         setRoom(message.room); // Update room state when player joins or game starts
         if (message.type === 'game_start') {
           alert('All players joined! Game started!');
         }
-      } else if (message.type === 'turn_reset') {
-        setRoom(message.room);
-        alert('The turn has been reset.');
+      } else if (message.type === 'moves_reset') {
+        setRoom(prevRoom => ({
+          ...prevRoom,
+          submitted_moves_points: message.room.submitted_moves_points
+        }));
       } else if (message.type === 'game_over') {
         const rankingText = message.ranking
           .map((p, index) => `${index + 1}: ${p.name} (Score: ${p.score.toFixed(4)})`)
@@ -353,11 +362,29 @@ function GameRoom({ room, setRoom, onBack, mode }) {
     return () => {
       ws.close();
     };
-  }, [room.id, setRoom]); // Reconnect if room.id changes
+  }, [room.id, setRoom, mode]); // Reconnect if room.id changes
 
 
+  const handleCalculateScores = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/calculate-scores`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        //const updatedRoom = await response.json();
+        //setRoom(updatedRoom); // Update the room state in the parent component
+        // alert('Scores calculated and turn advanced!');
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to calculate scores.');
+      }
+    } catch (error) {
+      console.error("Error calculating scores:", error);
+      alert("Error: " + error.message);
+    }
+  };
 
-  const handleSubmitMove = async (e) => {
+    const handleSubmitMove = async (e) => {
     e.preventDefault();
     const moveData = {
       player_id: movePlayerId, // Use movePlayerId directly
@@ -386,32 +413,17 @@ function GameRoom({ room, setRoom, onBack, mode }) {
     }
   };
 
-  const handleCalculateScores = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/calculate-scores`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        const updatedRoom = await response.json();
-        setRoom(updatedRoom); // Update the room state in the parent component
-        // alert('Scores calculated and turn advanced!');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to calculate scores.');
-      }
-    } catch (error) {
-      console.error("Error calculating scores:", error);
-      alert("Error: " + error.message);
-    }
-  };
-
-  const handleResetTurn = async () => {
-    if (window.confirm('Are you sure you want to reset the current turn? All submitted moves in this turn will be lost.')) {
+  const handleResetTurn = async (playerId) => {
+    if (window.confirm('Are you sure you want to reset the submitted moves for this player?')) {
       try {
-        const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/reset-turn`, {
+        const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/reset-moves`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player_id: playerId }),
         });
-        if (!response.ok) {
+      if (response.ok) {
+        //
+      } else {
           const errorData = await response.json();
           throw new Error(errorData.detail || 'Failed to reset turn.');
         }
@@ -474,13 +486,16 @@ function GameRoom({ room, setRoom, onBack, mode }) {
                     <button onClick={handleCalculateScores} className="calculate-scores-button">
                         Calculate Scores & Next Turn
                     </button>
-                    <button onClick={handleResetTurn} className="reset-turn-button">
-                        Reset Turn
+                    <button onClick={() => handleResetTurn(movePlayerId)} className="reset-turn-button">
+                        Reset Moves
                     </button>
                 </div>
             </div>
         </div>
       </header>
+      <footer>
+          <p><a href="https://github.com/shizuo-kaji/markov-game/" target="_blank" rel="noopener noreferrer">Rules & Codes</a></p>
+      </footer>
     </div>
   );
 }
