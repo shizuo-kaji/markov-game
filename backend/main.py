@@ -6,6 +6,8 @@ import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
+from datetime import datetime
+from logging_conf import get_room_logger
 
 app = FastAPI()
 
@@ -139,6 +141,29 @@ def create_room(room_data: RoomCreate):
         new_room.players.append(Player(id=player_id, name=player_name))
 
     rooms[new_room.id] = new_room
+
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(new_room.id)
+    logger.info(
+        "room_started",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            # identifiers
+            "room_id": new_room.id,
+            "room_name": new_room.name,
+            # game parameters requested
+            "num_players_N":            new_room.num_players_N,
+            "num_non_player_nodes_M":   new_room.num_non_player_nodes_M,
+            "points_per_round_K":       new_room.points_per_round_K,
+            "max_turns_S":              new_room.max_turns_S,
+            # current roster / limits (kept for backwards-compat)
+            "players": [
+                    {"id": p.id, "name": p.name}
+                    for p in new_room.players
+                ],
+        },
+    )
+    # -------------------------------------------------------------------------
     return new_room
 
 @app.get("/rooms", response_model=List[Room])
@@ -169,6 +194,21 @@ async def submit_move(room_id: str, move: Move):
 
     room.submitted_moves_points[move.player_id] = current_points_spent + points_spent
     room.moves.append(move)
+
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "move",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "round": room.turn,
+            "player": move.player_id,
+            "source": move.source,
+            "target": move.target,
+            "weight_change": move.weight_change,
+        },
+    )
+    # -------------------------------------------------------------------------
 
     await broadcast_message(room_id, {"type": "move_submitted", "room": room.dict()}) # Broadcast updated room
     return move
@@ -235,6 +275,20 @@ async def calculate_scores(room_id: str):
             player.score = stationary_distribution[node_index[player.name]]
             print(f"Player {player.name} ({player.id}) score updated to: {player.score}")
 
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "scores_round",
+        extra={
+                "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "round": room.turn,
+            "adj_matrix": adj_matrix.tolist(),
+            "stationary_dist": stationary_distribution.tolist(),
+            "scores": {p.id: p.score for p in room.players},
+        },
+    )
+    # -------------------------------------------------------------------------
+
     # 5. Reset for next turn
     room.moves = []
     room.turn += 1
@@ -254,6 +308,20 @@ async def calculate_scores(room_id: str):
             "room": room.dict(),
             "ranking": [{"id": p.id, "name": p.name, "score": p.score} for p in ranked_players]
         }
+
+        # Logger --------------------------------------------------------------
+        logger.info(
+            "game_over",
+            extra={
+                "ts": datetime.now().isoformat(timespec="milliseconds"),
+                "final_ranking": [
+                    {"id": p.id, "name": p.name, "score": p.score}
+                    for p in ranked_players
+                ],
+            },
+        )
+        # ---------------------------------------------------------------------
+
         await broadcast_message(room_id, game_over_message)
         del rooms[room_id] # Remove room from in-memory storage
     else:
@@ -272,6 +340,16 @@ async def reset_moves(room_id: str, request: ResetMovesRequest):
         room.submitted_moves_points[request.player_id] = 0
 
     print(f"Moves reset for player {request.player_id} in room {room_id}")
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "reset_moves",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "request_player": request.player_id,
+        },
+    )
+    # -------------------------------------------------------------------------
 
     # Broadcast the updated room state to all clients in the room
     await broadcast_message(room_id, {"type": "moves_reset", "room": room.dict()})
