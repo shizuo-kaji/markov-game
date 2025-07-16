@@ -1,10 +1,34 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Network } from 'vis-network';
 import { DataSet } from 'vis-data';
 import './App.css';
 
 //const API_BASE_URL = 'http://localhost:8000';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+const gameRules = `
+- **プレイヤー数**: N人で対戦します。
+- **初期盤面**: N個のプレイヤーノードとM個の非プレイヤーノードが、対称的に適当に連結された重み付きグラフが初期盤面となります。
+- **ラウンドの進行**: 各ラウンドで、それぞれのプレイヤーには K ポイントが割り振られます。
+- **ムーブの提出**: プレイヤーは、Kポイント分の「ムーブ」を他のプレイヤーに伏せて提出します。1ポイントにつき，選んだ辺の重みを1増やすか減らすことができます．ポイントを使い切るまで，複数の辺の重みを変更できます．
+- **盤面への反映**: 全てのプレイヤーがムーブを提出した後、それらが盤面に反映されます。
+- **スコア計算**: 盤面である重み付きグラフの、固有値1の固有ベクトル（マルコフ過程の定常状態）を計算します。固有ベクトルのプレイヤーノードの成分がそのプレイヤーの得点になります。(解の一意性を保証するために、全ての辺の重みに小さな正の値を加えます。)
+- **ターン**: 上記のプロセスを S ターン繰り返します。
+- **ゲーム終了**: ゲーム終了時に、得点の高い順にランキングが表示されます。
+`;
+
+function HelpModal({ onClose }) {
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>&times;</button>
+        <h2>Game Rules</h2>
+        <ReactMarkdown>{gameRules}</ReactMarkdown>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [rooms, setRooms] = useState([]);
@@ -14,6 +38,7 @@ function App() {
   const [newRoomNonPlayerNodesM, setNewRoomNonPlayerNodesM] = useState(1);
   const [newRoomPointsK, setNewRoomPointsK] = useState(5);
   const [newRoomMaxTurnsS, setNewRoomMaxTurnsS] = useState(3);
+  const [showHelp, setShowHelp] = useState(false);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -120,8 +145,10 @@ function App() {
 
   return (
     <div className="App">
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       <header className="App-header">
         <h1>Markov Chain Game</h1>
+        <button onClick={() => setShowHelp(true)} style={{position: 'absolute', top: 10, right: 10}}>Help</button>
         <div className="room-manager">
           <div className="room-list">
             <h2>Available Rooms</h2>
@@ -221,6 +248,7 @@ function GameRoom({ room, setRoom, onBack, mode }) {
   const [moveSource, setMoveSource] = useState(room.graph.nodes && room.graph.nodes.length > 0 ? room.graph.nodes[0].id : '');
   const [moveTarget, setMoveTarget] = useState(room.graph.nodes && room.graph.nodes.length > 1 ? room.graph.nodes[1].id : '');
   const [moveWeight, setMoveWeight] = useState(1);
+  const [showHelp, setShowHelp] = useState(false);
 
   const networkRef = useRef(null); // Add this ref
   const visNetwork = useRef(null); // vis-network インスタンスを保持するためのref
@@ -436,8 +464,10 @@ function GameRoom({ room, setRoom, onBack, mode }) {
 
   return (
     <div className="App">
+       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
        <header className="App-header">
         <button onClick={onBack} style={{position: 'absolute', top: 10, left: 10}}>Back to Lobby</button>
+        <button onClick={() => setShowHelp(true)} style={{position: 'absolute', top: 10, right: 10}}>Help</button>
         <h2>{room.name}</h2>
         <div className="game-layout">
             <div id="mynetwork" ref={networkRef} className="graph-container"></div>

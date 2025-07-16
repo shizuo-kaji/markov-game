@@ -72,6 +72,7 @@ frontend/.env の内容を，backend の URL に合わせて適宜編集して�
 
 ```bash
 cd ../frontend
+mv .env .env.org
 npm install
 npm start
 ```
