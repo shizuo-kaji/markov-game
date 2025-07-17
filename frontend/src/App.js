@@ -249,6 +249,7 @@ function GameRoom({ room, setRoom, onBack, mode }) {
   const [moveTarget, setMoveTarget] = useState(room.graph.nodes && room.graph.nodes.length > 1 ? room.graph.nodes[1].id : '');
   const [moveWeight, setMoveWeight] = useState(1);
   const [showHelp, setShowHelp] = useState(false);
+  const [gameOverData, setGameOverData] = useState(null);
 
   const networkRef = useRef(null); // Add this ref
   const visNetwork = useRef(null); // vis-network インスタンスを保持するためのref
@@ -326,6 +327,63 @@ function GameRoom({ room, setRoom, onBack, mode }) {
     }
   }, [room.graph]); // This effect depends on room.graph for updates.
 
+  useEffect(() => {
+    if (gameOverData && networkRef.current) {
+        // Destroy the old network instance if it exists
+        if (visNetwork.current) {
+            visNetwork.current.destroy();
+        }
+
+        // Get node positions from the old network before destroying it
+        const nodePositions = nodesDataSet.current ? nodesDataSet.current.get({ returnType: 'Object' }) : {};
+
+        const nodesWithPositions = gameOverData.room.graph.nodes.map((node, index) => {
+            const position = nodePositions[node.id];
+            if (position) {
+                return { id: node.id, label: String(node.id), x: position.x, y: position.y };
+            }
+            // Fallback for new nodes or if positions weren't stored
+            const radius = gameOverData.room.graph.nodes.length * 40;
+            const angle = (index / gameOverData.room.graph.nodes.length) * 2 * Math.PI;
+            return {
+                id: node.id,
+                label: String(node.id),
+                x: radius * Math.cos(angle),
+                y: radius * Math.sin(angle),
+            };
+        });
+
+        nodesDataSet.current = new DataSet(nodesWithPositions);
+        edgesDataSet.current = new DataSet(gameOverData.room.graph.edges.map(edge => ({ from: edge.source, to: edge.target, label: String(edge.weight) })));
+
+        const data = {
+            nodes: nodesDataSet.current,
+            edges: edgesDataSet.current,
+        };
+        const options = {
+            physics: {
+                enabled: false,
+            },
+            edges: {
+                arrows: 'to',
+                smooth: {
+                    enabled: true,
+                    type: "curvedCW",
+                    roundness: 0.15
+                }
+            },
+        };
+
+        visNetwork.current = new Network(networkRef.current, data, options);
+        setTimeout(() => {
+            if (visNetwork.current) {
+                visNetwork.current.fit();
+            }
+        }, 100);
+    }
+}, [gameOverData]);
+
+
   // This effect is ONLY for cleaning up the network when the component unmounts.
   useEffect(() => {
     return () => {
@@ -360,7 +418,7 @@ function GameRoom({ room, setRoom, onBack, mode }) {
           ...message.room,
           mode: { player_id: prevRoom.mode?.player_id || mode?.player_id }
         }));
-        alert('Scores calculated and turn advanced!');
+        alert('Turn advanced!');
       } else if (message.type === 'player_joined' || message.type === 'game_start') {
         setRoom(message.room); // Update room state when player joins or game starts
         if (message.type === 'game_start') {
@@ -372,10 +430,8 @@ function GameRoom({ room, setRoom, onBack, mode }) {
           submitted_moves_points: message.room.submitted_moves_points
         }));
       } else if (message.type === 'game_over') {
-        const rankingText = message.ranking
-          .map((p, index) => `${index + 1}: ${p.name} (Score: ${p.score.toFixed(4)})`)
-          .join('\n');
-        alert(`Game Over!\n\nFinal Rankings:\n${rankingText}`);
+        setGameOverData(message);
+        setRoom(prevRoom => ({ ...prevRoom, graph: message.room.graph }));
       }
     };
 
@@ -391,26 +447,6 @@ function GameRoom({ room, setRoom, onBack, mode }) {
       ws.close();
     };
   }, [room.id, setRoom, mode]); // Reconnect if room.id changes
-
-
-  const handleCalculateScores = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/rooms/${room.id}/calculate-scores`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        //const updatedRoom = await response.json();
-        //setRoom(updatedRoom); // Update the room state in the parent component
-        // alert('Scores calculated and turn advanced!');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to calculate scores.');
-      }
-    } catch (error) {
-      console.error("Error calculating scores:", error);
-      alert("Error: " + error.message);
-    }
-  };
 
     const handleSubmitMove = async (e) => {
     e.preventDefault();
@@ -461,6 +497,58 @@ function GameRoom({ room, setRoom, onBack, mode }) {
       }
     }
   };
+
+  if (gameOverData) {
+    return (
+        <div className="App">
+            <header className="App-header">
+                <button onClick={onBack} style={{position: 'absolute', top: 10, left: 10}}>Back to Lobby</button>
+                <h2>Game Over</h2>
+                <div className="game-layout">
+                    <div id="mynetwork" ref={networkRef} className="graph-container"></div>
+                    <div className="control-panel">
+                        <h3>Final Rankings</h3>
+                        <table className="players-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {gameOverData.ranking.map((p, index) => (
+                                    <tr key={p.id}>
+                                        <td>{index + 1}</td>
+                                        <td>{p.name}</td>
+                                        <td>{p.score.toFixed(4)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <h3>All Node Scores</h3>
+                        <table className="players-table">
+                            <thead>
+                                <tr>
+                                    <th>Node</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Object.entries(gameOverData.all_node_scores).map(([node, score]) => (
+                                    <tr key={node}>
+                                        <td>{node}</td>
+                                        <td>{score.toFixed(4)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </header>
+        </div>
+    );
+  }
 
   return (
     <div className="App">
@@ -513,9 +601,6 @@ function GameRoom({ room, setRoom, onBack, mode }) {
                     </form>
                 </div>
                 <div className="calculate-scores-button-container">
-                    <button onClick={handleCalculateScores} className="calculate-scores-button">
-                        Calculate Scores & Next Turn
-                    </button>
                     <button onClick={() => handleResetTurn(movePlayerId)} className="reset-turn-button">
                         Reset Moves
                     </button>
