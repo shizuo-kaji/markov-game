@@ -176,6 +176,20 @@ async def _calculate_scores_and_advance_turn(room_id: str):
             "ranking": [{"id": p.id, "name": p.name, "score": p.score} for p in ranked_players],
             "all_node_scores": all_node_scores
         }
+
+        # Logger --------------------------------------------------------------
+        logger.info(
+            "game_over",
+            extra={
+                "ts": datetime.now().isoformat(timespec="milliseconds"),
+                "final_ranking": [
+                    {"id": p.id, "name": p.name, "score": p.score}
+                    for p in ranked_players
+                ],
+            },
+        )
+        # ---------------------------------------------------------------------
+
         await broadcast_message(room_id, game_over_message)
         if room_id in rooms:
             del rooms[room_id] # Remove room from in-memory storage
@@ -249,6 +263,30 @@ def create_room(room_data: RoomCreate):
         new_room.players.append(Player(id=player_id, name=player_name))
 
     rooms[new_room.id] = new_room
+
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(new_room.id)
+    logger.info(
+        "room_started",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            # identifiers
+            "room_id": new_room.id,
+            "room_name": new_room.name,
+            # game parameters requested
+            "num_players_N":            new_room.num_players_N,
+            "num_non_player_nodes_M":   new_room.num_non_player_nodes_M,
+            "points_per_round_K":       new_room.points_per_round_K,
+            "max_turns_S":              new_room.max_turns_S,
+            # current roster / limits (kept for backwards-compat)
+            "players": [
+                    {"id": p.id, "name": p.name}
+                    for p in new_room.players
+                ],
+        },
+    )
+    # -------------------------------------------------------------------------
+
     return new_room
 
 @app.get("/rooms", response_model=List[Room])
@@ -279,6 +317,21 @@ async def submit_move(room_id: str, move: Move):
 
     room.submitted_moves_points[move.player_id] = current_points_spent + points_spent
     room.moves.append(move)
+
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "move",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "round": room.turn,
+            "player": move.player_id,
+            "source": move.source,
+            "target": move.target,
+            "weight_change": move.weight_change,
+        },
+    )
+    # -------------------------------------------------------------------------
 
     await broadcast_message(room_id, {"type": "move_submitted", "room": room.dict()})
 
