@@ -6,6 +6,8 @@ import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
+from datetime import datetime
+from logging_conf import get_room_logger
 
 app = FastAPI()
 
@@ -139,6 +141,20 @@ async def _calculate_scores_and_advance_turn(room_id: str):
         if player.name in node_index:
             player.score = all_node_scores[player.name]
             print(f"Player {player.name} ({player.id}) score updated to: {player.score}")
+
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "scores_round",
+        extra={
+                "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "round": room.turn,
+            "adj_matrix": adj_matrix.tolist(),
+            "stationary_dist": stationary_distribution.tolist(),
+            "scores": {p.id: p.score for p in room.players},
+        },
+    )
+    # -------------------------------------------------------------------------
 
     # 5. Reset for next turn
     room.moves = []
@@ -285,6 +301,16 @@ async def reset_moves(room_id: str, request: ResetMovesRequest):
         room.submitted_moves_points[request.player_id] = 0
 
     print(f"Moves reset for player {request.player_id} in room {room_id}")
+    # Logger ------------------------------------------------------------------
+    logger = get_room_logger(room_id)
+    logger.info(
+        "reset_moves",
+        extra={
+            "ts": datetime.now().isoformat(timespec="milliseconds"),
+            "request_player": request.player_id,
+        },
+    )
+    # -------------------------------------------------------------------------
 
     # Broadcast the updated room state to all clients in the room
     await broadcast_message(room_id, {"type": "moves_reset", "room": room.dict()})
