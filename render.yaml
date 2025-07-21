@@ -20,6 +20,7 @@ services:
     rootDir: frontend
     buildCommand: "npm install && npm run build"
     publishPath: "./dist" # Vite's default output directory
+    spa: true # serve index.html for all routes in this SPA
     envVars:
       - key: VITE_APP_API_URL
         fromService:
