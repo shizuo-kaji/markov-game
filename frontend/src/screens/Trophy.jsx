@@ -3,19 +3,6 @@ import { useApi } from '../../apiConfig.js';
 
 export default function Trophy({ onRestart, room }) {
   const apiBase = useApi();
-  // delete room on component mount
-  useEffect(() => {
-    async function deleteRoom() {
-      try {
-        const res = await fetch(`${apiBase}/rooms/${room.id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete room');
-        console.log('Room deleted:', room.id);
-      } catch (err) {
-        console.error('Error deleting room:', err);
-      }
-    }
-    if (room?.id) deleteRoom();
-  }, [apiBase, room]);
 
   // sort players by score descending for ranking
   const sortedPlayers = [...room.players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));

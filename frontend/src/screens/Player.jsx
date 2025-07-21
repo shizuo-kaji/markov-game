@@ -6,6 +6,22 @@ import ReturnButton from '../components/ReturnButton.jsx';
 import { useApi } from '../../apiConfig.js';
 
 export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn }) {
+  const apiBase = useApi();
+  // Inform server of current screen location
+  useEffect(() => {
+    (async () => {
+      try {
+        await fetch(`${apiBase}/rooms/${room.id}/players/${currentPlayerId}/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: 'PlayerTurn' })
+        });
+      } catch (e) {
+        console.error('Error updating location:', e);
+      }
+    })();
+  }, [apiBase, room.id, currentPlayerId]);
+
   const playerName = room.players.find(p => p.id === currentPlayerId)?.name || '';
 
   // Track board selection via state
@@ -39,7 +55,6 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
   const bgModeColor   = mode === "endorse" ? endorseColor : sabotageColor;
 
   const boardRef = useRef(null);
-  const apiBase = useApi();
 
   const pointsUsed    = moves.reduce((s, m) => s + m.value, 0);
   const totalPoints   = room.points_per_round_K ?? 0;
@@ -102,8 +117,8 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
   };
 
   const endTurn = () => {
-    // Optionally validate finished state
-    onEndTurn?.();
+    // Optionally validate finished state, pass current turn number
+    onEndTurn?.(room.turn);
   };
 
   // Reset this player's submitted moves via API

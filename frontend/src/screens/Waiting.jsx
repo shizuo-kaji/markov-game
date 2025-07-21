@@ -4,12 +4,27 @@ import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
 
-function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
+function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turnNumber }) {
   const apiBase = useApi();
-  // Maintain local room state and poll for updates
+  // Inform server of current screen location
+  useEffect(() => {
+    (async () => {
+      try {
+        await fetch(`${apiBase}/rooms/${room.id}/players/${currentPlayerId}/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: 'Waiting' })
+        });
+      } catch (e) {
+        console.error('Error updating location:', e);
+      }
+    })();
+  }, [apiBase, room.id, currentPlayerId]);
+
+  // The following are fetched every 0.5 seconds
   const [currentRoom, setCurrentRoom] = useState(room);
-  // backend advance flag
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+  const [turnCompleted, setTurnCompleted] = useState(false);
   useEffect(() => {
     const fetchRoom = async () => {
       try {
@@ -33,9 +48,23 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
         console.error('Error fetching ready flag:', e);
       }
     };
-    const interval = setInterval(() => { fetchRoom(); fetchReady(); }, 500);
+    const fetchTurnCompleted = async () => {
+      // look up current turn object by its number key
+      const curr = currentRoom.turns?.[turnNumber];
+      if (!curr) return;
+      try {
+        const res = await fetch(`${apiBase}/rooms/${room.id}/turns/${curr.id}/completed`);
+        if (res.ok) {
+          const { turn_completed } = await res.json();
+          setTurnCompleted(turn_completed);
+        }
+      } catch (e) {
+        console.error('Error fetching turn status:', e);
+      }
+    };
+    const interval = setInterval(() => { fetchRoom(); fetchReady(); fetchTurnCompleted(); }, 500);
     return () => clearInterval(interval);
-  }, [apiBase, room.id]);
+  }, [apiBase, room.id, turnNumber, currentRoom.turns]);
 
   // derive dynamic nodes from backend (players and neutrals) for map layout
   const nodes = [
@@ -61,42 +90,49 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
     }))
   ];
 
-  // determine if all players have used their points
-  const allDone = currentRoom.players.every(p => (currentRoom.submitted_moves_points[p.id] || 0) >= currentRoom.points_per_round_K);
-  // track whether we've already auto-advanced to avoid duplicate calls
-  const [hasAutoAdvanced, setHasAutoAdvanced] = useState(false);
   // derive if this is the final turn for UI messaging
-  const [isLastTurn, setIsLastTurn] = useState(false);
-
-  // // reset auto-advance guard on each new turn
-  // useEffect(() => {
-  //   setHasAutoAdvanced(false);
-  // }, [currentRoom.turn]);
+  const isLastTurn = currentRoom.turn > currentRoom.max_turns_S
 
   /* --- auto-advance and navigation -------------------------------- */
-  useEffect(() => {
-    // only advance once when all players are ready
-    if (!readyToAdvance || hasAutoAdvanced) return;
+   // effect: trigger advance-turn while ready and not yet completed
+   useEffect(() => {
+    if (!(readyToAdvance && !turnCompleted)) return;
     (async () => {
       try {
         const res = await fetch(`${apiBase}/rooms/${room.id}/advance-turn`, { method: 'POST' });
         if (!res.ok) throw new Error('Advance turn failed');
-        const updatedRoom = await res.json();
-        // setCurrentRoom(updatedRoom);
-        setHasAutoAdvanced(true);
-        setIsLastTurn(updatedRoom.turn > updatedRoom.max_turns_S);
-        console.log('Auto-advance: Turn advanced to', updatedRoom.turn);
-        // after 5 seconds, automatically navigate
-        setTimeout(() => {
-          console.log('Navigating now to', isLastTurn ? 'GameOver' : 'NextTurn');
-          if (isLastTurn) onGameOver();
-          else onNextTurn();
-        }, 5000);
+        console.log('Auto-advance: posted advance-turn');
       } catch (err) {
         console.error('Error during auto-advance:', err);
       }
     })();
-  }, [readyToAdvance, hasAutoAdvanced, apiBase, room.id, onGameOver, onNextTurn]);
+  }, [readyToAdvance, turnCompleted, apiBase, room.id]);
+
+  // effect: navigate after turn completed
+  useEffect(() => {
+    if (!turnCompleted) return;
+    let timer;
+    let updatedRoom;
+    // first refresh room data
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase}/rooms/${room.id}`);
+        if (res.ok) {
+          updatedRoom = await res.json();
+          setCurrentRoom(updatedRoom);
+        }
+      } catch (e) {
+        console.error('Error refreshing room before navigation:', e);
+      }
+      // then schedule navigation
+      timer = setTimeout(() => {
+        console.log('Navigating now to', updatedRoom.turn > updatedRoom.max_turns_S ? 'GameOver' : 'NextTurn');
+        if (updatedRoom.turn > updatedRoom.max_turns_S) onGameOver();
+        else onNextTurn();
+      }, 5000);
+    })();
+    return () => clearTimeout(timer);
+  }, [turnCompleted, apiBase, room.id, onGameOver, onNextTurn]);
 
   /* --- render ---------------------------------------------------------- */
   return (
@@ -147,14 +183,14 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
       <footer className="h-60 flex flex-col items-center justify-center bg-stone-100/80 p-4">
         <img src="/assets/background/wait2_clean.png" alt="logo" className="w-[150px] h-[120px]" />
         <div className="flex items-center justify-center">
-          {!hasAutoAdvanced ? (
-            <h2 className="font-bold">Waiting for other players</h2>
-          ) : (
+        {turnCompleted ? (
             <h2 className="font-bold">
               {isLastTurn
                 ? 'Final score coming in 5 seconds...'
                 : 'Next turn starting in 5 seconds...'}
             </h2>
+          ) : (
+            <h2 className="font-bold">Waiting for other players</h2>
           )}
         </div>
       </footer>

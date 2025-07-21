@@ -13,6 +13,7 @@ export default function GameApp() {
   const apiBase = useApi();
   const [screen, setScreen] = useState("welcome");
   const [rooms, setRooms] = useState([]);  // list of available rooms
+  const [lastTurnNumber, setLastTurnNumber] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
 
   // Fetch rooms when on welcome screen
@@ -184,16 +185,18 @@ export default function GameApp() {
         <Player
           room={selectedRoom}
           currentPlayerId={selectedRoom.mode.player_id}
-          onEndTurn={() => setScreen("waiting")}
+          onEndTurn={(turnNumber) => { setLastTurnNumber(turnNumber); setScreen("waiting"); }}
           onReturn={() => setScreen("welcome")}
         />
       )}
       {screen === "waiting" && (
         <Waiting
           room={selectedRoom}
+          currentPlayerId={selectedRoom.mode.player_id}
           onNextTurn={handleNextTurn}
           onGameOver={handleGameOver}
           onReturn={() => setScreen("welcome")}
+          turnNumber={lastTurnNumber}
         />
       )}
       {screen === "trophy" && selectedRoom && (
