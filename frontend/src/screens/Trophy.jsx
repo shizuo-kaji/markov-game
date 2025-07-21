@@ -25,7 +25,7 @@ export default function Trophy({ onRestart, room }) {
     items-center 
     justify-center 
     h-screen 
-    bg-[url('assets/background/bg_texture.png')]
+    bg-[url('/assets/background/bg_texture.png')]
     bg-yellow-50">
       <div className="flex-1"></div>
       <img src={"/assets/background/end.png"} alt="logo" className="w-80 h-80" />

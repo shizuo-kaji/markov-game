@@ -88,7 +88,7 @@ const Board = forwardRef(function Board({
   return (
     <Component
       ref={containerRef}
-      className={`bg-[url('assets/background/bg3.png')] bg-white/20 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`}
+      className={`bg-[url('/assets/background/bg3.png')] bg-white/20 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`}
       {...restProps}
     >
       {nodes.map((n) => (
