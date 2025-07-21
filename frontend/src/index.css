@@ -1,14 +1,42 @@
-/* You can add global styles to this file, and also import other style files */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@import "tailwindcss";
+
+/* --- Global layout constraints --- */
+@layer base {
+  html, body {
+    height: 100%;
+    @apply bg-black;
+  }
+  #root {
+    /* never exceed 800px; shrink with viewport; center */
+    @apply w-full max-w-[800px] mx-auto px-4 box-border;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.appBackground {
+  @apply relative flex flex-col h-screen;
+  @apply bg-white/90 bg-blend-overlay bg-cover bg-center;
+  background-image: url('/assets/background/bg2.png');
+}
+
+.appWelcome {
+  @apply relative flex h-screen;
+  @apply bg-orange-900 bg-contain;
+  @apply text-amber-100 font-mono;
+  background-image: url('/assets/background/bg4.png');
+}
+
+.sidePanel {
+  @apply w-110 p-4 flex bg-orange-900/90 flex-col space-y-4;
+}
+
+/* hide Chrome/Edge spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* hide Firefox spinner */
+input[type="number"] {
+  -moz-appearance: textfield;
 }

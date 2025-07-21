@@ -1,0 +1,32 @@
+import { useState } from "react";
+import { useApi } from '../../apiConfig.js';
+
+export default function Waiting({ onNextTurn, onGameOver }) {
+  const apiBase = useApi();
+  return (
+    <div className="flex flex-col 
+    items-center 
+    justify-center 
+    h-screen 
+    bg-[url('assets/logo/bg_texture2.png')]
+    bg-yellow-50">
+      <img src={"/assets/logo/wait_nbg.png"} alt="logo" className="w-90 h-90" />
+      <div className="text-8xl select-none p-10">⏰</div>
+      <h2 className="text-4xl mt-4">Waiting for other players</h2>
+      <button
+        className="mt-8 px-6 py-2 bg-amber-400 rounded hover:bg-amber-500"
+        onClick={onNextTurn}
+      >
+        Next turn
+      </button>
+
+      <button
+        className="mt-8 px-6 py-2 bg-amber-400 rounded hover:bg-amber-500"
+        onClick={onGameOver}
+      >
+        End Game
+      </button>
+
+    </div>
+  );
+}

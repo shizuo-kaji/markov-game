@@ -1,35 +1,24 @@
-.App {
+#root {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-  padding: 20px;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
+@keyframes logo-spin {
   from {
     transform: rotate(0deg);
   }
@@ -38,181 +27,16 @@
   }
 }
 
-.move-submission form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.move-submission label {
-  text-align: left;
-  margin-bottom: -5px;
-}
-
-.move-submission input,
-.move-submission select,
-.move-submission button {
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #61dafb;
-  background-color: #282c34;
-  color: white;
-}
-
-.move-submission button {
-  background-color: #61dafb;
-  color: #282c34;
-  cursor: pointer;
-}
-
-.join-section, .spectator-info {
-  margin-top: 20px;
-  padding: 20px;
-  border: 1px solid #61dafb;
-  border-radius: 8px;
-  background-color: #3a3f47;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-}
-
-.join-section input,
-.spectator-info input {
-  width: 80%;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #61dafb;
-  background-color: #282c34;
-  color: white;
-}
-
-.join-section button,
-.spectator-info button {
-  padding: 10px 20px;
-  border-radius: 4px;
-  border: none;
-  background-color: #61dafb;
-  color: #282c34;
-  cursor: pointer;
-}
-
-/* GameRoom Layout */
-.game-layout {
-  display: flex;
-  flex-direction: column; /* Mobile-first: column layout */
-  width: 100%;
-  height: calc(100vh - 120px); /* Adjust height considering header */
-  padding: 10px;
-  gap: 10px; /* Add space between graph and control panel */
-}
-
-.graph-container {
-  flex: 1; /* Take available space */
-  border: 1px solid #ccc;
-  position: relative;
-  min-height: 300px; /* Minimum height for mobile */
-}
-
-.control-panel {
-  flex: 0.5; /* Take available space */
-  padding: 10px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  background-color: #3a3f47;
-  overflow-y: auto; /* Allow scrolling if content overflows */
-}
-
-.calculate-scores-button-container {
-  margin-top: auto; /* Push button to the bottom */
-  padding-top: 10px;
-}
-
-.calculate-scores-button {
-  width: 100%;
-  padding: 10px;
-  background-color: #61dafb;
-  color: #282c34;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.reset-turn-button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px; /* Add some space between the buttons */
-  background-color: #f44336; /* Red color for reset button */
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* Desktop/Tablet Layout */
-@media (min-width: 768px) {
-  .game-layout {
-    flex-direction: row; /* Switch to row layout for larger screens */
-  }
-
-  .graph-container {
-    flex: 2; /* Give more space to the graph */
-  }
-
-  .control-panel {
-    flex: 1; /* Adjust control panel width */
-    min-width: 300px; /* Ensure control panel is not too narrow */
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
   }
 }
 
-/* Modal styles */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+.card {
+  padding: 2em;
 }
 
-.modal-content {
-  background-color: #fff;
-  color: #333;
-  padding: 20px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 80%;
-  overflow-y: auto;
-  text-align: left;
-}
-
-.modal-content h2 {
-  margin-top: 0;
-}
-
-.modal-content ul {
-  padding-left: 20px;
-}
-
-.modal-content li {
-  margin-bottom: 10px;
-}
-
-.modal-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
+.read-the-docs {
+  color: #888;
 }
