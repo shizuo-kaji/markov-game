@@ -8,6 +8,8 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
   const apiBase = useApi();
   // Maintain local room state and poll for updates
   const [currentRoom, setCurrentRoom] = useState(room);
+  // backend advance flag
+  const [readyToAdvance, setReadyToAdvance] = useState(false);
   useEffect(() => {
     const fetchRoom = async () => {
       try {
@@ -20,7 +22,18 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
         console.error('Error fetching room updates:', e);
       }
     };
-    const interval = setInterval(fetchRoom, 500);
+    const fetchReady = async () => {
+      try {
+        const res = await fetch(`${apiBase}/rooms/${room.id}/ready-to-advance`);
+        if (res.ok) {
+          const { ready_to_advance } = await res.json();
+          setReadyToAdvance(ready_to_advance);
+        }
+      } catch (e) {
+        console.error('Error fetching ready flag:', e);
+      }
+    };
+    const interval = setInterval(() => { fetchRoom(); fetchReady(); }, 500);
     return () => clearInterval(interval);
   }, [apiBase, room.id]);
 
@@ -53,7 +66,7 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
   // track whether we've already auto-advanced to avoid duplicate calls
   const [hasAutoAdvanced, setHasAutoAdvanced] = useState(false);
   // derive if this is the final turn for UI messaging
-  const isLastTurn = currentRoom.turn > currentRoom.max_turns_S;
+  const [isLastTurn, setIsLastTurn] = useState(false);
 
   // // reset auto-advance guard on each new turn
   // useEffect(() => {
@@ -62,27 +75,28 @@ function Waiting({ room, onNextTurn, onGameOver , onReturn }) {
 
   /* --- auto-advance and navigation -------------------------------- */
   useEffect(() => {
-    // only advance once when all players are done
-    if (!allDone || hasAutoAdvanced) return;
+    // only advance once when all players are ready
+    if (!readyToAdvance || hasAutoAdvanced) return;
     (async () => {
       try {
         const res = await fetch(`${apiBase}/rooms/${room.id}/advance-turn`, { method: 'POST' });
         if (!res.ok) throw new Error('Advance turn failed');
-        const updated = await res.json();
-        // setCurrentRoom(updated);
+        const updatedRoom = await res.json();
+        // setCurrentRoom(updatedRoom);
         setHasAutoAdvanced(true);
-        console.log('Auto-advance: Turn advanced to', updated.turn);
+        setIsLastTurn(updatedRoom.turn > updatedRoom.max_turns_S);
+        console.log('Auto-advance: Turn advanced to', updatedRoom.turn);
         // after 5 seconds, automatically navigate
         setTimeout(() => {
-          console.log('Navigating now to', updated.turn > updated.max_turns_S ? 'GameOver' : 'NextTurn');
-          if (updated.turn > updated.max_turns_S) onGameOver();
+          console.log('Navigating now to', isLastTurn ? 'GameOver' : 'NextTurn');
+          if (isLastTurn) onGameOver();
           else onNextTurn();
         }, 5000);
       } catch (err) {
         console.error('Error during auto-advance:', err);
       }
     })();
-  }, [allDone, hasAutoAdvanced, apiBase, room.id, onGameOver, onNextTurn]);
+  }, [readyToAdvance, hasAutoAdvanced, apiBase, room.id, onGameOver, onNextTurn]);
 
   /* --- render ---------------------------------------------------------- */
   return (

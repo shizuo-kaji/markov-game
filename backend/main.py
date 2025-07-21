@@ -481,25 +481,41 @@ async def reset_moves(room_id: str, request: ResetMovesRequest):
     # Return updated room to client
     return room
 
+def ready_to_advance(room_id: str) -> bool:
+    room = get_room_safe(room_id)
+    # This was extracted from the advance_turn endpoint
+    if not room.players or not all(room.submitted_moves_points.get(p.id, 0) >= room.points_per_round_K for p in room.players):
+        return False
+    return True
 
 @app.post("/rooms/{room_id}/advance-turn", response_model=Room)
 async def advance_turn(room_id: str):
     room = get_room_safe(room_id)
     # ensure all players have submitted
-    if not room.players or not all(room.submitted_moves_points.get(p.id, 0) >= room.points_per_round_K for p in room.players):
+    if not ready_to_advance(room_id):
         raise HTTPException(status_code=400, detail="Not all players have submitted their moves yet")
     await _calculate_scores_and_advance_turn(room_id)
     return room
 
+@app.get("/rooms/{room_id}/ready-to-advance", response_model=dict)
+async def get_ready_to_advance(room_id: str):
+    """
+    Returns whether all players have submitted moves for the given room.
+    """
+    # raises HTTPException if room not found
+    ready = ready_to_advance(room_id)
+    return {"ready_to_advance": ready}
+
 @app.post("/rooms/{room_id}/players/{player_id}/rename", response_model=Player)
-def rename_player(room_id: str, player_id: str, request: RenamePlayerRequest):
+async def rename_player(room_id: str, player_id: str, request: RenamePlayerRequest):
     room = get_room_safe(room_id)
     print(f"rename_player called for room {room_id}, player_id {player_id}")
     print("Existing player IDs:", [p.id for p in room.players], "Names:",[p.name for p in room.players])
     for p in room.players:
         if p.id == player_id:
             p.name = request.new_name
-            # Broadcast updated room state if needed
+            # Broadcast updated room state
+            await broadcast_message(room_id, {"type": "player_renamed", "room": room.dict()})
             return p
     raise HTTPException(status_code=404, detail="Player not found in this room")
 
