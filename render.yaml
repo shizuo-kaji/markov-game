@@ -14,7 +14,7 @@ services:
 
   # Frontend (React + Vite)
   - type: static
-    name: webgame-frontend
+    name: markov-game
     region: sydney # Kyoto JS users should use the Sydney region
     plan: free # or your preferred plan
     rootDir: frontend
