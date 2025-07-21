@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReturnButton from '../components/ReturnButton.jsx';
 
-export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRenamePlayer }) {
+export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRenamePlayer, onGameOver }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+
+  // if game already finished, navigate immediately to Trophy
+  useEffect(() => {
+    if (room.turn > room.max_turns_S) onGameOver();
+  }, [room, onGameOver]);
 
   return (
   <div 

@@ -176,6 +176,7 @@ export default function GameApp() {
         <RoomLobby 
           room={selectedRoom} 
           onStart={handleSelectPlayer}
+          onGameOver={handleGameOver}
           onDeleteRoom={(id) => { handleDeleteRoom(id); setScreen("welcome"); }}
           onReturn={() => setScreen("welcome")}
           onRenamePlayer={handleRenamePlayer}
