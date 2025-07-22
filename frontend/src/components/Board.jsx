@@ -7,6 +7,7 @@ import React, {
   forwardRef
 } from "react";
 import DiredEdge from "./DiredEdge";
+import BoardPlayerEdges from "./BoardPlayerEdges.jsx";
 
 const Board = forwardRef(function Board({
   as: Component = "div",
@@ -15,6 +16,8 @@ const Board = forwardRef(function Board({
   bgModeColor = "gray",
   resetSignal,
   onSelectionChange,
+  currentRoom,
+  playMode,
   ...restProps
 }, ref) {
   const containerRef = useRef(null);
@@ -24,6 +27,8 @@ const Board = forwardRef(function Board({
   const [to, setTo] = useState(null);
   const [arrow, setArrow] = useState(null); // provisional single arrow only
 
+  const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(false);
+
   // Handle node selection
   const handleSelect = (id) => {
     if (!from) {setFrom(id); return;}
@@ -32,7 +37,7 @@ const Board = forwardRef(function Board({
     setTo(id);
   };
 
-  // Compute provisional arrow when both selected
+  // Compute provisional arrow when both selectFed
   useEffect(() => {
     if (from && to && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -132,6 +137,21 @@ const Board = forwardRef(function Board({
           </button>
         ))}
         <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
+        <button
+          className="absolute top-1 left-1 p-1 border rounded bg-white/70 drop-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => setShowBoardPlayerEdges(true)}
+          disabled={!from}
+        >
+          Markov
+        </button>
+        {showBoardPlayerEdges && (
+          <BoardPlayerEdges
+            onReturn={() => setShowBoardPlayerEdges(false)}
+            room={currentRoom}
+            selectedPlayerId={from}
+            playMode={playMode}
+          />
+        )}
       </Component>
   );
 });

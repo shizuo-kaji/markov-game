@@ -178,7 +178,7 @@ async def _calculate_scores_and_advance_turn(room_id: str):
         adj_matrix[u, v] = weight
     print("Adjacency Matrix:\n", adj_matrix)
     # Assign adjacency matrix to the current turn
-    room.turns[str(room.turn)].adj_matrix = adj_matrix.tolist()
+    room.turns[str(room.turn)].adj_matrix = np.where(adj_matrix == 0.1, 0, adj_matrix).tolist()
     room.turns[str(room.turn)].completed = True
 
     # Compute out/in degrees from adjacency matrix
@@ -400,14 +400,26 @@ def create_room(room_data: RoomCreate):
             edges.append({"source": neutral_ids[j], "target": neutral_ids[i], "weight": W_NN * INITIAL_POINT_WEIGHT})
     new_room.graph = {"nodes": [{"id": nid} for nid in all_node_ids], "edges": edges}
     # Initialize turns list with empty adjacency matrices
-    # Initialize turns list with unique UUIDs and sequential turn numbers
     new_room.turns = {
         str(i): Turn(
                 id=str(i),
                 adj_matrix=[],
                 completed=False
-        ) for i in range(1, new_room.max_turns_S + 1)
+        ) for i in range(new_room.max_turns_S + 1)
     }
+
+    # Initialize the zeroth turn's adjacency matrix
+    node_ids = [node["id"] for node in new_room.graph["nodes"]]
+    node_index = {name: i for i, name in enumerate(node_ids)}
+    matrix_size = len(node_ids)
+    adj_matrix = np.zeros((matrix_size, matrix_size))
+    for edge in new_room.graph["edges"]:
+        u, v = node_index[edge["source"]], node_index[edge["target"]]
+        # Adjacency matrix構築時に、重みが0の場合は0.1に置き換える
+        weight = max(0.1, float(edge["weight"])) # ここで0.1を加える
+        adj_matrix[u, v] = weight
+    new_room.turns["0"].adj_matrix = np.where(adj_matrix == 0.1, 0, adj_matrix).tolist()
+
     # Store the room
     rooms[new_room.id] = new_room
 
