@@ -1,8 +1,9 @@
-import React from "react";
-import RoomList from "../components/RoomList.jsx";
-import CreateRoom from "../components/CreateRoom.jsx";
+import React, { useState } from "react";
+import Help from "../components/Help.jsx";
 
 export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom }) {
+  const [showHelp, setShowHelp] = useState(false);
+
   return (
     <div 
       className="appWelcome"
@@ -39,7 +40,12 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
         ))}
 
         <div className="flex-1"></div>
-      
+        <button onClick={() => setShowHelp(true)}>
+        ❔ Help
+        </button>
+        {showHelp && (
+          <Help onReturn={() => setShowHelp(false)} />
+        )}
         <button
           className="relative h-12 bottom-2 bg-amber-300 text-orange-900 rounded p-2 font-bold hover:bg-amber-400 active:translate-y-0.5"
           onClick={onCreateRoom}
