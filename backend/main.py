@@ -12,10 +12,10 @@ from logging_conf import get_room_logger
 
 app = FastAPI()
 # Default edge weights
-W_PP = 1.0  # player-player
+W_PP = 0.0  # player-player
 W_NN = 1.0  # neutral-neutral
 W_PN = 2.0  # player-neutral
-INITIAL_POINT_WEIGHT = None  # Initial point weight for new edges
+INITIAL_POINT_WEIGHT = 1.0  # Initial point weight for new edges
 
 # Compute node positions in a circle
 def get_pos(N, center=[0.5, 0.5], radius=0.15):
@@ -173,8 +173,8 @@ async def _calculate_scores_and_advance_turn(room_id: str):
 
     for edge in room.graph["edges"]:
         u, v = node_index[edge["source"]], node_index[edge["target"]]
-        # Adjacency matrix構築時に、重みが0の場合は0.1に置き換える
-        weight = max(0.1, float(edge["weight"])) # ここで0.1を加える
+        # Adjacency matrix構築時に、重みが0の場合は0.01に置き換える
+        weight = max(0.01, float(edge["weight"])) # ここで0.1を加える
         adj_matrix[u, v] = weight
     print("Adjacency Matrix:\n", adj_matrix)
     # Assign adjacency matrix to the current turn
@@ -315,7 +315,7 @@ def create_room(room_data: RoomCreate):
     global INITIAL_POINT_WEIGHT
     if INITIAL_POINT_WEIGHT is None:
         INITIAL_POINT_WEIGHT = int(
-            new_room.points_per_round_K 
+            new_room.points_per_round_K
             * new_room.num_players_N
             / new_room.num_non_player_nodes_M
             / new_room.max_turns_S
@@ -330,14 +330,14 @@ def create_room(room_data: RoomCreate):
         # derive display name from icon filename (strip extension)
         display_name = icon_name.rsplit('.', 1)[0] if icon_name else f"player_{i+1}"
         player = Player(
-            id=pid, 
-            name=display_name, 
+            id=pid,
+            name=display_name,
             icon=icon_name,
             out_deg=(
-                new_room.num_non_player_nodes_M * 2 
+                new_room.num_non_player_nodes_M * 2
                 + new_room.num_players_N - 1) * INITIAL_POINT_WEIGHT,
             in_deg=(
-                new_room.num_non_player_nodes_M * 2 
+                new_room.num_non_player_nodes_M * 2
                 + new_room.num_players_N - 1) * INITIAL_POINT_WEIGHT
         )
         new_room.players.append(player)
@@ -545,7 +545,7 @@ async def get_ready_to_advance(room_id: str):
     # raises HTTPException if room not found
     ready = ready_to_advance(room_id)
     return {"ready_to_advance": ready}
- 
+
 @app.get("/rooms/{room_id}/turns/{turn_id}/completed", response_model=dict)
 async def get_turn_completed(room_id: str, turn_id: str):
     """
@@ -580,7 +580,7 @@ async def update_player_location(
             })
             return p
     raise HTTPException(status_code=404, detail="Player not found in this room")
-    
+
 @app.post("/rooms/{room_id}/players/{player_id}/rename", response_model=Player)
 async def rename_player(room_id: str, player_id: str, request: RenamePlayerRequest):
     room = get_room_safe(room_id)

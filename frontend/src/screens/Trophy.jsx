@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useApi } from '../../apiConfig.js';
+import InitialEdges from "../components/InitialEdges.jsx";
 
 export default function Trophy({ onRestart, room }) {
   const apiBase = useApi();
@@ -17,9 +18,9 @@ export default function Trophy({ onRestart, room }) {
       <div className="flex-1"></div>
       <img src={"/assets/background/end.png"} alt="logo" className="w-80 h-80" />
       <p className="text-4xl p-4">{winner?.name} 🏆</p>
-      {/* player score header (ordered) {Math.round((winner?.score ?? 0) * 100)}% */}
 
-      {/* detailed ranking list (ordered) */}
+      <InitialEdges room={room} />
+
       <section className="
         text-center p-4 relative top-1
         text-[12px]">

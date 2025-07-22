@@ -11,10 +11,10 @@ const S_MAX = 10;
 
 export default function CreateRoom({ onCreate }) {
   const [name, setName] = useState("My Room");
-  const [N, setN] = useState(1);
+  const [N, setN] = useState(2);
   const [M, setM] = useState(1);
-  const [K, setK] = useState(10);
-  const [S, setS] = useState(1);
+  const [K, setK] = useState(5);
+  const [S, setS] = useState(2);
 
   const handleSubmit = e => {
     e.preventDefault();
@@ -166,7 +166,7 @@ export default function CreateRoom({ onCreate }) {
               type="button"
               onClick={() => setK(prev => Math.max(K_MIN, prev - 5))}
               className="
-                bg-stone-200 border border-gray-300 
+                bg-stone-200 border border-gray-300
                 rounded-l-lg px-3 h-10
                 hover:bg-stone-300 focus:ring-2 focus:ring-blue-500
                 flex items-center justify-center"
@@ -205,7 +205,7 @@ export default function CreateRoom({ onCreate }) {
                   : prev + 5
               ))}
               className="
-                bg-stone-200 border border-gray-300 
+                bg-stone-200 border border-gray-300
                 rounded-r-lg px-3 h-10
                 hover:bg-stone-300 focus:ring-2 focus:ring-blue-500
                 flex items-center justify-center"

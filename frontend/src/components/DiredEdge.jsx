@@ -2,8 +2,25 @@ import React from 'react';
 
 export default function DiredEdge({ coords, offset = 50, color = 'black', strokeWidth = 4 }) {
   if (!coords) return null;
-  const { x1, y1, x2, y2 } = coords;
+  const { x1, y1, x2, y2, weight_ab, weight_ba } = coords;
   const samePoint = x1 === x2 && y1 === y2;
+
+  // Calculate angle of the line
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  // Offset for text perpendicular to the line
+  const textOffset = 20; // Distance from the line
+
+  // Midpoint of the line
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+
+  // Position for weight_ab (offset to one side)
+  const textAbX = midX - textOffset * Math.sin(angle);
+  const textAbY = midY + textOffset * Math.cos(angle);
+
+  // Position for weight_ba (offset to the other side)
+  const textBaX = midX + textOffset * Math.sin(angle);
+  const textBaY = midY - textOffset * Math.cos(angle);
 
   // Derive actual color based on mode or override
   // Accepts modes: 'endorse', 'sabotage', 'grey', 'black'
@@ -54,6 +71,36 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
           strokeLinecap="round"
           markerEnd={`url(#arrowhead-${markerKey})`}
         />
+      )}
+      {weight_ab !== undefined && (
+        <text
+          x={textAbX}
+          y={textAbY}
+          textAnchor="middle"
+          fill="black"
+          fontSize="14"
+          fontWeight="bold"
+          stroke="white"
+          strokeWidth="4"
+          paintOrder="stroke"
+        >
+          {Math.floor(weight_ab)}
+        </text>
+      )}
+      {weight_ba !== undefined && (
+        <text
+          x={textBaX}
+          y={textBaY}
+          textAnchor="middle"
+          fill="black"
+          fontSize="14"
+          fontWeight="bold"
+          stroke="white"
+          strokeWidth="4"
+          paintOrder="stroke"
+        >
+          {Math.floor(weight_ba)}
+        </text>
       )}
     </svg>
   );

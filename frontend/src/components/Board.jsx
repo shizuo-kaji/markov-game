@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import DiredEdge from "./DiredEdge";
 import BoardPlayerEdges from "./BoardPlayerEdges.jsx";
+import InitialEdges from "./InitialEdges.jsx";
 
 const Board = forwardRef(function Board({
   as: Component = "div",
@@ -28,6 +29,7 @@ const Board = forwardRef(function Board({
   const [arrow, setArrow] = useState(null); // provisional single arrow only
 
   const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(false);
+  const [showInitialEdges, setShowInitialEdges] = useState(false);
 
   // Handle node selection
   const handleSelect = (id) => {
@@ -130,13 +132,21 @@ const Board = forwardRef(function Board({
           </button>
         ))}
         <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
-        <button
-          className="absolute top-1 left-1 p-1 border rounded bg-white/70 drop-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={() => setShowBoardPlayerEdges(true)}
-          disabled={!from}
-        >
-          Markov
-        </button>
+        <div className="absolute top-1 left-1 flex flex-col space-y-1">
+          <button
+            className="p-1 border rounded bg-white/70 drop-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setShowBoardPlayerEdges(true)}
+            disabled={!from}
+          >
+            Markov
+          </button>
+          <button
+            className="p-1 border rounded bg-white/70 drop-shadow"
+            onClick={() => setShowInitialEdges(!showInitialEdges)}
+          >
+            Edges
+          </button>
+        </div>
         {showBoardPlayerEdges && (
           <BoardPlayerEdges
             onReturn={() => setShowBoardPlayerEdges(false)}
@@ -145,6 +155,7 @@ const Board = forwardRef(function Board({
             playMode={playMode}
           />
         )}
+        {showInitialEdges && <InitialEdges onReturn={() => setShowInitialEdges(false)} room={currentRoom} />}
       </Component>
   );
 });
