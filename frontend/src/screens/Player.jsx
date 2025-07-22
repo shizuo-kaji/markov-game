@@ -186,6 +186,8 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
           bgModeColor={bgModeColor}
           resetSignal={resetCounter}
           onSelectionChange={setSelection}
+          currentRoom={room}
+          playMode={mode}
         />
         <section className="relative flex-[2]">
           <Ledger ledger={ledgerEntries} getNode={getNode} />
