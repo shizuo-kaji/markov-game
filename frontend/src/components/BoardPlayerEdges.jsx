@@ -33,17 +33,17 @@ export default function BoardPlayerEdges({ onReturn, room, selectedPlayerId, pla
           y2: toPx(n.y, dims.height)
         }))
     : [];
-  // Compute node labels from adjacency adMatrix for current turn
+  // Compute node labels from adjacency adjMatrix for current turn
   const turnIndex = room.turn - 1;
   const nodeLabels = useMemo(() => {
     // first turn: wildcard labels
-    const adMatrix = room.turns?.[turnIndex]?.adj_matrix || [];
-    const adMatrixIdx = nodes.findIndex((n) => n.id === selectedPlayerId);
+    const adjMatrix = room.turns?.[turnIndex]?.adj_matrix || [];
+    const adjMatrixIdx = nodes.findIndex((n) => n.id === selectedPlayerId);
     return nodes.map((n, idx) => {
       if (playMode === "sabotage") {
-        return adMatrix[adMatrixIdx]?.[idx] ?? "*";
+        return adjMatrix[adjMatrixIdx]?.[idx] ?? "*";
       } else {
-        return adMatrix[idx]?.[adMatrixIdx] ?? "*";
+        return adjMatrix[idx]?.[adjMatrixIdx] ?? "*";
       }
     });
   }, [nodes, room.turns, turnIndex, selectedPlayerId, playMode]);
