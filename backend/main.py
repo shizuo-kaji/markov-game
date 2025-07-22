@@ -174,7 +174,7 @@ async def _calculate_scores_and_advance_turn(room_id: str):
     for edge in room.graph["edges"]:
         u, v = node_index[edge["source"]], node_index[edge["target"]]
         # Adjacency matrix構築時に、重みが0の場合は0.01に置き換える
-        weight = max(0.01, float(edge["weight"])) # ここで0.1を加える
+        weight = max(0.01, float(edge["weight"]))
         adj_matrix[u, v] = weight
     print("Adjacency Matrix:\n", adj_matrix)
     # Assign adjacency matrix to the current turn

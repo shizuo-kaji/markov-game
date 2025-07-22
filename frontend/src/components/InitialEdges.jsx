@@ -32,31 +32,50 @@ export default function InitialEdges({ onReturn, room }) {
 
         if (!fromNode || !toNode) continue;
 
-        // For self-loops
+        // Self-loops
         if (i === j) {
           const weight = adjMatrix[i]?.[j] || 0;
           if (weight > 0) {
             edgeList.push({
+              id: `self-loop-${i}`,
               x1: toPx(fromNode.x, dims.width),
               y1: toPx(fromNode.y, dims.height),
               x2: toPx(toNode.x, dims.width),
               y2: toPx(toNode.y, dims.height),
-              weight_ab: weight, // Only one weight for self-loop
-              weight_ba: undefined,
+              weight_ab: weight,
+              weight_ba: undefined, // Ensure DiredEdge draws only one arrow for self-loop
+              offset: 80, // Default offset for self-loops
             });
           }
         } else if (i < j) { // Process each unique pair (i, j) once for non-self-loops
           const weight_ij = adjMatrix[i]?.[j] || 0; // weight from i to j
           const weight_ji = adjMatrix[j]?.[i] || 0; // weight from j to i
 
-          if (weight_ij > 0 || weight_ji > 0) {
+          // Edge from i to j
+          if (weight_ij > 0) {
             edgeList.push({
+              id: `edge-${i}-${j}-forward`,
               x1: toPx(fromNode.x, dims.width),
               y1: toPx(fromNode.y, dims.height),
               x2: toPx(toNode.x, dims.width),
               y2: toPx(toNode.y, dims.height),
               weight_ab: weight_ij,
-              weight_ba: weight_ji,
+              weight_ba: undefined, // This edge is only i -> j
+              offset: 80, // Offset for i -> j
+            });
+          }
+
+          // Edge from j to i
+          if (weight_ji > 0) {
+            edgeList.push({
+              id: `edge-${j}-${i}-backward`,
+              x1: toPx(toNode.x, dims.width), // Start from toNode
+              y1: toPx(toNode.y, dims.height),
+              x2: toPx(fromNode.x, dims.width), // End at fromNode
+              y2: toPx(fromNode.y, dims.height),
+              weight_ab: weight_ji, // This edge is only j -> i
+              weight_ba: undefined,
+              offset: -80, // Different offset for j -> i to avoid overlap
             });
           }
         }
@@ -71,12 +90,12 @@ export default function InitialEdges({ onReturn, room }) {
       className="absolute w-full h-full bg-black/30"
       onClick={onReturn}
     >
-      {edges.map((edge, i) => (
+      {edges.map((edge) => (
         <DiredEdge
-          key={i}
+          key={edge.id}
           coords={edge}
-          offset={60}
-          color="grey"
+          offset={edge.offset}
+          color="black"
           strokeWidth={2}
         />
       ))}

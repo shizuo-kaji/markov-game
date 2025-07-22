@@ -141,7 +141,7 @@ const Board = forwardRef(function Board({
             Markov
           </button>
           <button
-            className="p-1 border rounded bg-white/70 drop-shadow"
+            className="p-1 border rounded bg-white/50 drop-shadow"
             onClick={() => setShowInitialEdges(!showInitialEdges)}
           >
             Edges
