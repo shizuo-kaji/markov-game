@@ -66,7 +66,7 @@ const Board = forwardRef(function Board({
       setArrow(null);
     }
     // notify parent of new selection
-    // onSelectionChange?.({ from, to });
+    onSelectionChange?.({ from, to });
   }, [from, to]);
 
   // Respond to external reset signal
@@ -131,14 +131,13 @@ const Board = forwardRef(function Board({
             </span>
           </button>
         ))}
-        <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
-
         {showBoardPlayerEdges && (
           <BoardPlayerEdges
             room={currentRoom}
             playMode={playMode}
           />
         )}
+        <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
 
       </Component>
   );

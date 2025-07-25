@@ -285,11 +285,9 @@ export default function CreateRoom({ onCreate }) {
           </div>
         </div>
 
-        <div className="flex-1"></div>
-
         <button
           type="submit"
-          className="relative h-12 bottom-2 bg-amber-300 text-orange-900 rounded p-2 font-bold hover:bg-amber-400 active:translate-y-0.5"
+          className="relative h-12 bg-amber-300 text-orange-900 rounded p-2 font-bold hover:bg-amber-400 active:translate-y-0.5"
         >
           CREATE ROOM
         </button>

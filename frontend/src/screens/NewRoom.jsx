@@ -8,6 +8,7 @@ export default function NewRoom({ onCreate, onReturn }) {
 
   // Callback to create a new room via API, then navigate back
   const handleCreate = async (roomData) => {
+    console.log('Attempting to create room with data:', roomData);
     try {
       const res = await fetch(`${apiBase}/rooms`, {
         method: 'POST',

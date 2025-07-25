@@ -63,9 +63,16 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
 
   // Submit current selection as a move via API
   const submit = async () => {
-    if (value === 0) return;
+    console.log('Submit button clicked.');
+    if (value === 0) {
+      console.log('Value is 0, returning.');
+      return;
+    }
     const sel = selection;
-    if (!sel.from || !sel.to) return;
+    if (!sel.from || !sel.to) {
+      console.log('No nodes selected, returning.');
+      return;
+    }
     try {
       const res = await fetch(`${apiBase}/rooms/${room.id}/moves`, {
         method: 'POST',

@@ -14,7 +14,7 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
 
-  // Position for weight_ab
+  // Position for weight
   const textAbX = midX - textOffset * Math.sin(angle);
   const textAbY = midY + textOffset * Math.cos(angle);
 
