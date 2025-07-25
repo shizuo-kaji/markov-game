@@ -18,6 +18,9 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
   const textAbX = midX - textOffset * Math.sin(angle);
   const textAbY = midY + textOffset * Math.cos(angle);
 
+  const textX = samePoint ? x1 : textAbX;
+  const textY = samePoint ? y1 - offset - 15 : textAbY;
+
   // Derive actual color based on mode or override
   // Accepts modes: 'endorse', 'sabotage', 'grey', 'black'
   const modeColors = {
@@ -49,13 +52,12 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
       </defs>
 
       {samePoint ? (
-        <circle
-          cx={x1}
-          cy={y1}
-          r={offset}
+        <path
+          d={`M ${x1} ${y1 - offset} A ${offset} ${offset} 0 1 1 ${x1} ${y1 + offset} A ${offset} ${offset} 0 1 1 ${x1} ${y1 - offset}`}
           fill="none"
           stroke={strokeColor}
           strokeWidth={strokeWidth}
+          markerEnd={`url(#arrowhead-${markerKey})`}
         />
       ) : (
         <path
@@ -70,8 +72,8 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
       )}
       {weight !== undefined && (
         <text
-          x={textAbX}
-          y={textAbY}
+          x={textX}
+          y={textY}
           textAnchor="middle"
           fill="black"
           fontSize="14"

@@ -32,7 +32,6 @@ export default function BoardPlayerEdges({ room, playMode }) {
   console.log('BoardPlayerEdges: turnIndex', turnIndex);
   const edges = nodes.flatMap((fromNode, fromIdx) =>
     nodes
-      .filter((toNode, toIdx) => fromNode.id !== toNode.id)
       .map((toNode, toIdx) => {
         const weight = room.turns?.[turnIndex]?.adj_matrix?.[fromIdx]?.[toIdx] ?? 0;
         return {
