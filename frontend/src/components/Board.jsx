@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import DiredEdge from "./DiredEdge";
 import BoardPlayerEdges from "./BoardPlayerEdges.jsx";
-import InitialEdges from "./InitialEdges.jsx";
+
 
 const Board = forwardRef(function Board({
   as: Component = "div",
@@ -29,7 +29,7 @@ const Board = forwardRef(function Board({
   const [arrow, setArrow] = useState(null); // provisional single arrow only
 
   const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(true);
-  const [showInitialEdges, setShowInitialEdges] = useState(false);
+
 
   // Handle node selection
   const handleSelect = (id) => {
@@ -66,7 +66,7 @@ const Board = forwardRef(function Board({
       setArrow(null);
     }
     // notify parent of new selection
-    onSelectionChange?.({ from, to });
+    // onSelectionChange?.({ from, to });
   }, [from, to]);
 
   // Respond to external reset signal
@@ -95,7 +95,7 @@ const Board = forwardRef(function Board({
   return (
     <Component
       ref={containerRef}
-      className={`bg-[url('/assets/background/bg3.png')] bg-white/20 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`}
+      className={`bg-[url('/assets/background/bg3.png')] bg-white/10 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`}
       {...restProps}
     >
       {nodes.map((n) => (
@@ -132,15 +132,14 @@ const Board = forwardRef(function Board({
           </button>
         ))}
         <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
-        
+
         {showBoardPlayerEdges && (
           <BoardPlayerEdges
-            onReturn={() => setShowBoardPlayerEdges(false)}
             room={currentRoom}
             playMode={playMode}
           />
         )}
-        {showInitialEdges && <InitialEdges onReturn={() => setShowInitialEdges(false)} room={currentRoom} />}
+
       </Component>
   );
 });

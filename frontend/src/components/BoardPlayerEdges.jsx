@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import DiredEdge from "./DiredEdge";
 
-export default function BoardPlayerEdges({ onReturn, room, playMode }) {
+export default function BoardPlayerEdges({ room, playMode }) {
   const nodes = room.nodes || [];
   const getNode = (id) => nodes.find((n) => n.id === id);
   const endorseColor  = "hsla(110, 70%, 50%, 1.00)";
@@ -43,7 +43,7 @@ export default function BoardPlayerEdges({ onReturn, room, playMode }) {
   }, [nodes]);
 
   return (
-    <div ref={containerRef} className="absolute w-full h-full bg-black/70">
+    <div ref={containerRef} className="absolute w-full h-full pointer-events-none">
       {/* Render one edge per node */}
       {edges.map((coords, i) => (
         <DiredEdge
@@ -56,7 +56,7 @@ export default function BoardPlayerEdges({ onReturn, room, playMode }) {
         />
       ))}
       {/* Overlay close button and node markers */}
-      <button className="absolute inset-0 text-left" onClick={onReturn}>
+      
         {nodes.map((n, idx) => (
           <div
             key={n.id}
@@ -71,7 +71,7 @@ export default function BoardPlayerEdges({ onReturn, room, playMode }) {
             </span>
           </div>
         ))}
-      </button>
+      
     </div>
   );
 }
