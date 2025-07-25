@@ -28,7 +28,7 @@ const Board = forwardRef(function Board({
   const [to, setTo] = useState(null);
   const [arrow, setArrow] = useState(null); // provisional single arrow only
 
-  const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(false);
+  const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(true);
   const [showInitialEdges, setShowInitialEdges] = useState(false);
 
   // Handle node selection
@@ -132,26 +132,11 @@ const Board = forwardRef(function Board({
           </button>
         ))}
         <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
-        <div className="absolute top-1 left-1 flex flex-col space-y-1">
-          <button
-            className="p-1 border rounded bg-white/70 drop-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => setShowBoardPlayerEdges(true)}
-            disabled={!from}
-          >
-            Markov
-          </button>
-          <button
-            className="p-1 border rounded bg-white/50 drop-shadow"
-            onClick={() => setShowInitialEdges(!showInitialEdges)}
-          >
-            Edges
-          </button>
-        </div>
+        
         {showBoardPlayerEdges && (
           <BoardPlayerEdges
             onReturn={() => setShowBoardPlayerEdges(false)}
             room={currentRoom}
-            selectedPlayerId={from}
             playMode={playMode}
           />
         )}

@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function DiredEdge({ coords, offset = 50, color = 'black', strokeWidth = 4 }) {
+export default function DiredEdge({ coords, offset = 50, color = 'black', strokeWidth = 4, weight }) {
   if (!coords) return null;
-  const { x1, y1, x2, y2, weight_ab } = coords;
+  const { x1, y1, x2, y2 } = coords;
   const samePoint = x1 === x2 && y1 === y2;
 
   // Calculate angle of the line
@@ -68,7 +68,7 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
           markerEnd={`url(#arrowhead-${markerKey})`}
         />
       )}
-      {weight_ab !== undefined && (
+      {weight !== undefined && (
         <text
           x={textAbX}
           y={textAbY}
@@ -80,7 +80,7 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
           strokeWidth="4"
           paintOrder="stroke"
         >
-          {Math.floor(weight_ab)}
+          {Math.floor(weight)}
         </text>
       )}
       
