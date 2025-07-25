@@ -2,6 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import DiredEdge from "./DiredEdge";
 
 export default function BoardPlayerEdges({ room, playMode }) {
+  if (!room || !room.nodes) {
+    console.log('BoardPlayerEdges: room or room.nodes is undefined, returning null.');
+    return null;
+  }
+  console.log('BoardPlayerEdges: room', room);
   const nodes = room.nodes || [];
   const getNode = (id) => nodes.find((n) => n.id === id);
   const endorseColor  = "hsla(110, 70%, 50%, 1.00)";
@@ -24,6 +29,7 @@ export default function BoardPlayerEdges({ room, playMode }) {
       ? (parseFloat(coord) / 100) * size
       : Number(coord);
   const turnIndex = room.turn - 1;
+  console.log('BoardPlayerEdges: turnIndex', turnIndex);
   const edges = nodes.flatMap((fromNode, fromIdx) =>
     nodes
       .filter((toNode, toIdx) => fromNode.id !== toNode.id)
@@ -38,6 +44,7 @@ export default function BoardPlayerEdges({ room, playMode }) {
         };
       })
   );
+  // Compute node labels from adjacency adjMatrix for current turn
   const nodeLabels = useMemo(() => {
     return nodes.map(() => ""); // Simply return empty strings for now
   }, [nodes]);
