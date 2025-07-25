@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
+import networkx as nx
 
 import os
 from datetime import datetime
@@ -17,14 +18,35 @@ W_NN = 1.0  # neutral-neutral
 W_PN = 2.0  # player-neutral
 INITIAL_POINT_WEIGHT = 1.0  # Initial point weight for new edges
 
-# Compute node positions in a circle
-def get_pos(N, center=[0.5, 0.5], radius=0.15):
-    positions = []
-    for n in range(N):
-        theta = 2 * np.pi * n / N
-        pos = center + radius * np.array([np.cos(theta), np.sin(theta)])
-        positions.append(pos)
-    return positions
+import networkx as nx
+
+# Compute node positions using force-directed layout
+def get_pos(nodes, edges):
+    G = nx.Graph()
+    for node in nodes:
+        G.add_node(node["id"])
+    for edge in edges:
+        G.add_edge(edge["source"], edge["target"], weight=edge["weight"])
+
+    # Use Kamada-Kawai layout
+    pos = nx.kamada_kawai_layout(G)
+
+    # Normalize positions to fit within the 0-1 range
+    x_coords, y_coords = zip(*pos.values())
+    min_x, max_x = min(x_coords), max(x_coords)
+    min_y, max_y = min(y_coords), max(y_coords)
+
+    def normalize(val, min_val, max_val):
+        return (val - min_val) / (max_val - min_val) if max_val > min_val else 0.5
+
+    normalized_pos = {
+        node: (
+            normalize(p[0], min_x, max_x) * 0.8 + 0.1, # Scale and shift to avoid edges
+            normalize(p[1], min_y, max_y) * 0.8 + 0.1
+        )
+        for node, p in pos.items()
+    }
+    return normalized_pos
 
 # Load default icon names for players and neutrals
 BASE_DIR = Path(__file__).parent
@@ -361,21 +383,6 @@ def create_room(room_data: RoomCreate):
         )
         new_room.neutrals.append(neutral)
         neutral_ids.append(nid)
-    # Assign spatial positions (normalized and percentage) for players and neutrals
-    # Players on radius 0.35
-    player_positions = get_pos(new_room.num_players_N, center=[0.5, 0.5], radius=0.35)
-    for idx, player in enumerate(new_room.players):
-        x, y = player_positions[idx]
-        player.x, player.y = float(x), float(y)
-        player.x_str = f"{int(x * 100)}%"
-        player.y_str = f"{int(y * 100)}%"
-    # Neutrals on smaller radius 0.12
-    neutral_positions = get_pos(new_room.num_non_player_nodes_M, center=[0.5, 0.5], radius=0.12)
-    for idx, neutral in enumerate(new_room.neutrals):
-        x, y = neutral_positions[idx]
-        neutral.x, neutral.y = float(x), float(y)
-        neutral.x_str = f"{int(x * 100)}%"
-        neutral.y_str = f"{int(y * 100)}%"
     # Build graph nodes list
     all_node_ids = player_ids + neutral_ids
     # Generate simple symmetric graph edges
@@ -398,6 +405,22 @@ def create_room(room_data: RoomCreate):
         for j in range(i+1, len(neutral_ids)):
             edges.append({"source": neutral_ids[i], "target": neutral_ids[j], "weight": W_NN * INITIAL_POINT_WEIGHT})
             edges.append({"source": neutral_ids[j], "target": neutral_ids[i], "weight": W_NN * INITIAL_POINT_WEIGHT})
+    new_room.graph = {"nodes": [{"id": nid} for nid in all_node_ids], "edges": edges}
+
+    # Assign spatial positions using force-directed layout
+    positions = get_pos(new_room.graph["nodes"], new_room.graph["edges"])
+    for player in new_room.players:
+        if player.id in positions:
+            x, y = positions[player.id]
+            player.x, player.y = float(x), float(y)
+            player.x_str = f"{int(x * 100)}%"
+            player.y_str = f"{int(y * 100)}%"
+    for neutral in new_room.neutrals:
+        if neutral.id in positions:
+            x, y = positions[neutral.id]
+            neutral.x, neutral.y = float(x), float(y)
+            neutral.x_str = f"{int(x * 100)}%"
+            neutral.y_str = f"{int(y * 100)}%"
     new_room.graph = {"nodes": [{"id": nid} for nid in all_node_ids], "edges": edges}
     # Initialize turns list with empty adjacency matrices
     new_room.turns = {

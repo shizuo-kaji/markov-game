@@ -10,6 +10,9 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
   // Offset for text perpendicular to the line
   const textOffset = 20; // Distance from the line
 
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  const safeDist = dist < 1e-6 ? 1e-6 : dist; // Avoid division by zero
+
   // Midpoint of the line
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
@@ -34,7 +37,7 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
   const strokeColor = modeColors[markerKey];
 
   return (
-    <svg style={{ overflow: 'visible', position: 'absolute', pointerEvents: 'none' }}>
+    <svg style={{ overflow: 'visible', position: 'absolute', pointerEvents: 'none', width: '100%', height: '100%' }}>
       <defs>
         {/* One marker per predefined color */}
         <marker id="arrowhead-endorse" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto" markerUnits="strokeWidth">
@@ -61,8 +64,7 @@ export default function DiredEdge({ coords, offset = 50, color = 'black', stroke
         />
       ) : (
         <path
-          d={`M ${x1} ${y1} Q ${(x1 + x2) / 2 - (y2 - y1) / Math.hypot(x2 - x1, y2 - y1) * offset} 
-              ${(y1 + y2) / 2 + (x2 - x1) / Math.hypot(x2 - x1, y2 - y1) * offset} ${x2} ${y2}`}
+          d={`M ${x1} ${y1} Q ${(x1 + x2) / 2 - (y2 - y1) / safeDist * offset} ${(y1 + y2) / 2 + (x2 - x1) / safeDist * offset} ${x2} ${y2}`}
           fill="none"
           stroke={strokeColor}
           strokeWidth={strokeWidth}

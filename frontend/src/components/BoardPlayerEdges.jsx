@@ -42,6 +42,7 @@ export default function BoardPlayerEdges({ room, playMode }) {
           weight: weight,
         };
       })
+      .filter(edge => edge.weight > 0.9)
   );
   // Compute node labels from adjacency adjMatrix for current turn
   const nodeLabels = useMemo(() => {

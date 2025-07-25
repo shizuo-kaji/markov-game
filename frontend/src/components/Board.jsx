@@ -13,7 +13,7 @@ import BoardPlayerEdges from "./BoardPlayerEdges.jsx";
 const Board = forwardRef(function Board({
   as: Component = "div",
   className = "",
-  nodes,
+  nodes: initialNodes,
   bgModeColor = "gray",
   resetSignal,
   onSelectionChange,
@@ -23,6 +23,56 @@ const Board = forwardRef(function Board({
 }, ref) {
   const containerRef = useRef(null);
   const nodeRefs = useRef({});
+  const [nodes, setNodes] = useState([]);
+  const [draggingNode, setDraggingNode] = useState(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const newNodes = initialNodes.map(n => ({
+        ...n,
+        x: typeof n.x === 'string' ? (parseFloat(n.x) / 100) * rect.width : n.x,
+        y: typeof n.y === 'string' ? (parseFloat(n.y) / 100) * rect.height : n.y,
+      }));
+      setNodes(newNodes);
+    }
+  }, [initialNodes]);
+
+  const handleMouseDown = (e, id) => {
+    setDraggingNode(id);
+  };
+
+  const handleMouseMove = (e) => {
+    if (draggingNode === null) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newNodes = nodes.map(n => {
+      if (n.id === draggingNode) {
+        return {
+          ...n,
+          x: e.clientX - containerRect.left,
+          y: e.clientY - containerRect.top,
+        };
+      }
+      return n;
+    });
+    setNodes(newNodes);
+  };
+
+  const handleMouseUp = () => {
+    setDraggingNode(null);
+  };
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [draggingNode, nodes]);
+
 
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
@@ -39,17 +89,16 @@ const Board = forwardRef(function Board({
     setTo(id);
   };
 
-  // Compute provisional arrow when both selectFed
+  // Compute provisional arrow when both selected
   useEffect(() => {
     if (from && to && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const getCenter = (nid) => {
-        const el = nodeRefs.current[nid];
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
+        const node = nodes.find(n => n.id === nid);
+        if (!node) return null;
         return {
-          x: r.left - rect.left + r.width / 2,
-          y: r.top - rect.top + r.height / 2
+          x: node.x,
+          y: node.y
         };
       };
       const p1 = getCenter(from);
@@ -67,7 +116,7 @@ const Board = forwardRef(function Board({
     }
     // notify parent of new selection
     onSelectionChange?.({ from, to });
-  }, [from, to]);
+  }, [from, to, nodes]);
 
   // Respond to external reset signal
   useEffect(() => {
@@ -102,6 +151,7 @@ const Board = forwardRef(function Board({
         <button
           key={n.id}
             ref={(el) => (nodeRefs.current[n.id] = el)}
+            onMouseDown={(e) => handleMouseDown(e, n.id)}
             onClick={() => handleSelect(n.id)}
             className={`absolute flex flex-col items-center transition-transform -translate-x-1/2 -translate-y-1/2 ${
               isSelected(n.id)
@@ -113,7 +163,8 @@ const Board = forwardRef(function Board({
               left: n.x,
               backgroundColor: isSelected(n.id)
                 ? bgModeColor
-                : "rgba(243,244,246,0.0)"
+                : "rgba(243,244,246,0.0)",
+              cursor: draggingNode ? 'grabbing' : 'grab',
             }}
           >
            {/* degree indicators
@@ -132,13 +183,15 @@ const Board = forwardRef(function Board({
             </span>
           </button>
         ))}
-        {showBoardPlayerEdges && (
-          <BoardPlayerEdges
-            room={currentRoom}
-            playMode={playMode}
-          />
-        )}
-        <DiredEdge coords={arrow} offset={50} color={playMode} strokeWidth={4} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+          {showBoardPlayerEdges && (
+            <BoardPlayerEdges
+              room={{...currentRoom, nodes: nodes}}
+              playMode={playMode}
+            />
+          )}
+          <DiredEdge coords={arrow} offset={50} color={playMode} strokeWidth={4} />
+        </div>
 
       </Component>
   );

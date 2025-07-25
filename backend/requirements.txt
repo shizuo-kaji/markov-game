@@ -3,3 +3,4 @@ uvicorn[standard]
 numpy
 scipy
 python-json-logger
+networkx
