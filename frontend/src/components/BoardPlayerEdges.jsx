@@ -12,7 +12,7 @@ export default function BoardPlayerEdges({ room, playMode }) {
   const endorseColor  = "hsla(110, 70%, 50%, 1.00)";
   const sabotageColor = "hsla(0, 70%, 60%, 1.00)";
   const bgModeColor   = playMode === "endorse" ? endorseColor : sabotageColor;
-  
+
   // Container ref and dimensions for converting percent coords to pixels
   const containerRef = useRef(null);
   const [dims, setDims] = useState({ width: 0, height: 0 });
@@ -55,14 +55,14 @@ export default function BoardPlayerEdges({ room, playMode }) {
         <DiredEdge
           key={i}
           coords={coords}
-          offset={40}
-          color={playMode}
+          offset={60}
+          color={"grey"}
           strokeWidth={3}
           weight={coords.weight}
         />
       ))}
       {/* Overlay close button and node markers */}
-      
+
         {nodes.map((n, idx) => (
           <div
             key={n.id}
@@ -77,7 +77,7 @@ export default function BoardPlayerEdges({ room, playMode }) {
             </span>
           </div>
         ))}
-      
+
     </div>
   );
 }

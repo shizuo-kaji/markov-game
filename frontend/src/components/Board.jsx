@@ -116,11 +116,12 @@ const Board = forwardRef(function Board({
                 : "rgba(243,244,246,0.0)"
             }}
           >
-            {/* degree indicators */}
+           {/* degree indicators
               <div className="absolute bg-white/80 rounded top-1 left-1 flex flex-col items-start space-y-0.5 text-[8px] font-semibold text-black">
                 <span>出{n.out_deg?? -1} </span>
                 <span>入{n.in_deg?? -1} </span>
               </div>
+           */}
             <img
               src={`/assets/nodes/${n.icon}`}
               alt={n.name}
@@ -137,7 +138,7 @@ const Board = forwardRef(function Board({
             playMode={playMode}
           />
         )}
-        <DiredEdge coords={arrow} offset={40} color="black" strokeWidth={4} />
+        <DiredEdge coords={arrow} offset={50} color={playMode} strokeWidth={4} />
 
       </Component>
   );
