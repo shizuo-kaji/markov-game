@@ -153,7 +153,6 @@ const Board = forwardRef(function Board({
         <button
           key={n.id}
             ref={(el) => (nodeRefs.current[n.id] = el)}
-            onMouseDown={(e) => handleMouseDown(e, n.id)}
             onClick={() => handleSelect(n.id)}
             className={`absolute flex flex-col items-center transition-transform -translate-x-1/2 -translate-y-1/2 ${
               isSelected(n.id)
@@ -179,8 +178,11 @@ const Board = forwardRef(function Board({
               src={`/assets/nodes/${n.icon}`}
               alt={n.name}
               className="w-11 h-11"
+              style={{ pointerEvents: 'none' }}
             />
-            <span className="font-bold text-[12px] text-center bg-stone-100/90 rounded-lg border-1 border-black px-1 py-1">
+            <span
+              onMouseDown={(e) => handleMouseDown(e, n.id)}
+              className="font-bold text-[12px] text-center bg-stone-100/90 rounded-lg border-1 border-black px-1 py-1">
               {n.name}
             </span>
           </button>

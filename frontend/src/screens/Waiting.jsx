@@ -111,7 +111,6 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
   // effect: navigate after turn completed
   useEffect(() => {
     if (!turnCompleted) return;
-    let timer;
     let updatedRoom;
     // first refresh room data
     (async () => {
@@ -125,13 +124,10 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         console.error('Error refreshing room before navigation:', e);
       }
       // then schedule navigation
-      timer = setTimeout(() => {
-        console.log('Navigating now to', updatedRoom.turn > updatedRoom.max_turns_S ? 'GameOver' : 'NextTurn');
-        if (updatedRoom.turn > updatedRoom.max_turns_S) onGameOver();
-        else onNextTurn();
-      }, 5000);
+      console.log('Navigating now to', updatedRoom.turn > updatedRoom.max_turns_S ? 'GameOver' : 'NextTurn');
+      if (updatedRoom.turn > updatedRoom.max_turns_S) onGameOver();
+      else onNextTurn();
     })();
-    return () => clearTimeout(timer);
   }, [turnCompleted, apiBase, room.id, onGameOver, onNextTurn]);
 
   /* --- render ---------------------------------------------------------- */
@@ -164,6 +160,8 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
           as="section"
           className="relative flex-[8]"
           nodes={nodes}
+          currentRoom={currentRoom}
+          playMode="wait"
         />
         <section className="relative flex-[2] bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow text-[9px]">
           <ul className="list-none grid grid-cols-2 gap-x-4 gap-y-1">
@@ -186,8 +184,8 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         {turnCompleted ? (
             <h2 className="font-bold">
               {isLastTurn
-                ? 'Final score coming in 5 seconds...'
-                : 'Next turn starting in 5 seconds...'}
+                ? 'Final score coming...'
+                : 'Next turn starting...'}
             </h2>
           ) : (
             <h2 className="font-bold">Waiting for other players</h2>
