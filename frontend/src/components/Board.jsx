@@ -48,10 +48,12 @@ const Board = forwardRef(function Board({
     const containerRect = containerRef.current.getBoundingClientRect();
     const newNodes = nodes.map(n => {
       if (n.id === draggingNode) {
+        const x = Math.max(0, Math.min(e.clientX - containerRect.left, containerRect.width));
+        const y = Math.max(0, Math.min(e.clientY - containerRect.top, containerRect.height));
         return {
           ...n,
-          x: e.clientX - containerRect.left,
-          y: e.clientY - containerRect.top,
+          x: x,
+          y: y,
         };
       }
       return n;
