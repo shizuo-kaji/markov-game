@@ -50,6 +50,31 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
     }
   }, [room.moves, currentPlayerId]);
 
+  // Sync with backend: re-fetch room moves periodically
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const roomRes = await fetch(`${apiBase}/rooms/${room.id}`);
+        if (roomRes.ok) {
+          const data = await roomRes.json();
+          const updated = data.moves
+            .filter(m => m.player_id === currentPlayerId)
+            .map(m => ({
+              from: m.source,
+              to: m.target,
+              mode: m.weight_change >= 0 ? 'endorse' : 'sabotage',
+              value: Math.abs(m.weight_change)
+            }));
+          setMoves(updated);
+        }
+      } catch (e) {
+        console.error('Error syncing moves:', e);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [apiBase, room.id, currentPlayerId]);
+
   const endorseColor  = "hsla(110, 70%, 50%, 1.00)";
   const sabotageColor = "hsla(0, 70%, 60%, 1.00)";
   const bgModeColor   = mode === "endorse" ? endorseColor : sabotageColor;
@@ -100,23 +125,9 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
       boardRef.current.clearSelection();
       setValue(0);
       // Sync with backend: re-fetch room moves
-      try {
-        const roomRes = await fetch(`${apiBase}/rooms/${room.id}`);
-        if (roomRes.ok) {
-          const data = await roomRes.json();
-          const updated = data.moves
-            .filter(m => m.player_id === currentPlayerId)
-            .map(m => ({
-              from: m.source,
-              to: m.target,
-              mode: m.weight_change >= 0 ? 'endorse' : 'sabotage',
-              value: Math.abs(m.weight_change)
-            }));
-          setMoves(updated);
-        }
-      } catch (e) {
-        console.error('Error syncing moves:', e);
-      }
+      // This is now handled by the polling mechanism below.
+      // The local state `moves` is updated when a move is submitted,
+      // and the polling mechanism will eventually reconcile it with the backend.
     } catch (err) {
       console.error('Error submitting move:', err);
       alert('Error submitting move: ' + err.message);
