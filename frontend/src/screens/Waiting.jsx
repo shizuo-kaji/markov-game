@@ -89,6 +89,12 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
       in_deg: n.in_deg
     }))
   ];
+  const aiNotesMap = currentRoom.ai_move_notes || {};
+  const aiPlayers = currentRoom.players.filter((p) => p.is_ai);
+  const aiInsightEntries = aiPlayers.map((p) => ({
+    player: p,
+    notes: aiNotesMap[p.id] || []
+  }));
 
   // derive if this is the final turn for UI messaging
   const isLastTurn = currentRoom.turn > currentRoom.max_turns_S
@@ -139,7 +145,9 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         </h1>
         <section className="text-center p-2">
           {/* Display only player nodes with their scores */}
-          {currentRoom.players.map((p) => (
+          {currentRoom.players.map((p) => {
+            const noteText = p.is_ai ? (aiNotesMap[p.id]?.join(' / ') || 'AI controlled player') : '';
+            return (
             <span key={p.id} 
               className="
                 inline-flex items-center
@@ -147,13 +155,31 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
                 px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
               <img src={`/assets/nodes/${p.icon}`} 
                 alt={p.name} className="w-6 h-6" />
+              {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
               <span className="leading-none">
                 {Math.round((p.score ?? 0) * 100)}% 
               </span>
             </span>
-          ))}
+          );})}
         </section>
       </header>
+
+      {aiPlayers.length > 0 && (
+        <section className="mx-3 mb-2 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-3 py-2 text-xs text-white/90">
+          <h2 className="text-sm font-semibold text-emerald-200">AI Insights</h2>
+          {aiInsightEntries.some(entry => entry.notes.length) ? (
+            <ul className="mt-1 space-y-1">
+              {aiInsightEntries.map(({ player, notes }) => (
+                <li key={player.id}>
+                  <span className="font-semibold">{player.name}:</span> {notes.join(' / ')}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 italic">AI players are queueing their plans.</p>
+          )}
+        </section>
+      )}
 
       <main className="flex flex-col flex-1">
         <Board
@@ -168,6 +194,14 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
              {currentRoom.players.map(p => {
                const spent = currentRoom.submitted_moves_points[p.id] || 0;
                const remaining = currentRoom.points_per_round_K - spent;
+               if (p.is_ai) {
+                 const firstNote = aiNotesMap[p.id]?.[0];
+                 return (
+                   <li key={p.id} className="italic text-amber-400" title={firstNote || 'AI controlled player'}>
+                     {p.name}: 🤖 {firstNote || 'AI ready'}
+                   </li>
+                 );
+               }
                return (
                  <li key={p.id} className={remaining === 0 ? 'italic' : 'font-bold'}>
                    {p.name}: {remaining} points

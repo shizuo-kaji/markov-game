@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 from pathlib import Path
 import numpy as np
@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import networkx as nx
 
 import os
+import random
 from datetime import datetime
 from logging_conf import get_room_logger
 
@@ -100,6 +101,7 @@ class Player(BaseModel):
     location: str = ""  # current UI screen identifier
     out_deg: int = 0  # outgoing degree sum
     in_deg: int = 0   # incoming degree sum
+    is_ai: bool = False
 class LocationUpdateRequest(BaseModel):
     location: str
 
@@ -126,6 +128,7 @@ class Move(BaseModel):
     source: str
     target: str
     weight_change: int
+    note: Optional[str] = None
 
 class ResetMovesRequest(BaseModel):
     player_id: str
@@ -140,6 +143,7 @@ class MoveIn(BaseModel):
     source: str
     target: str
     weight_change: int
+    note: Optional[str] = None
 
 class Room(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -157,12 +161,154 @@ class Room(BaseModel):
     moves: List[Move] = []
     turn: int = 1
     submitted_moves_points: Dict[str, int] = {}
+    ai_move_notes: Dict[str, List[str]] = Field(default_factory=dict)
     turns: Dict[str, Turn] = {}
 
 # --- In-memory database ---
 rooms: Dict[str, Room] = {}
 
 # --- Helper Functions ---
+
+def _pick_weighted_edge(edges: List[Dict[str, Any]], *, prefer_low_weight: bool) -> Optional[Dict[str, Any]]:
+    """Return a representative edge either from the lightest or heaviest group."""
+    if not edges:
+        return None
+    sorted_edges = sorted(
+        edges,
+        key=lambda e: float(e.get("weight", 0.0)),
+        reverse=not prefer_low_weight,
+    )
+    window_size = min(3, len(sorted_edges))
+    return random.choice(sorted_edges[:window_size])
+
+
+def _incoming_edges(room: Room, target_id: str, preferred_sources: set[str] | None = None) -> List[Dict[str, Any]]:
+    edges = [edge for edge in room.graph.get("edges", []) if edge.get("target") == target_id]
+    if preferred_sources:
+        prioritized = [edge for edge in edges if edge.get("source") in preferred_sources]
+        if prioritized:
+            return prioritized
+    return edges
+
+
+def _select_competitor(room: Room, ai_player_id: str) -> Optional[Player]:
+    opponents = [p for p in room.players if p.id != ai_player_id]
+    if not opponents:
+        return None
+    return max(opponents, key=lambda p: p.score or 0.0)
+
+
+def _node_label(room: Room, node_id: str) -> str:
+    for p in room.players:
+        if p.id == node_id:
+            return p.name
+    for n in room.neutrals:
+        if n.id == node_id:
+            return n.name
+    return node_id
+
+
+def populate_ai_moves(room: Room):
+    """Ensure every AI player has submitted moves for the current turn."""
+    if not room.players:
+        return
+    node_edges = room.graph.setdefault("edges", [])
+    neutral_ids = {n.id for n in room.neutrals}
+    next_move_id = max((m.id for m in room.moves), default=0) + 1
+
+    for player in room.players:
+        if not player.is_ai:
+            continue
+        room.ai_move_notes[player.id] = []
+        current_spent = room.submitted_moves_points.get(player.id, 0)
+        budget = room.points_per_round_K - current_spent
+        if budget <= 0:
+            # Already submitted this round
+            if player.location != "Waiting":
+                player.location = "Waiting"
+            continue
+
+        ai_moves_payload = []
+
+        # Split effort between boosting own inbound edges and weakening the top opponent
+        boost_budget = max(1, (budget * 3) // 4)
+        sabotage_budget = budget - boost_budget
+
+        competitor_edge = None
+        competitor: Optional[Player] = None
+        if sabotage_budget > 0:
+            competitor = _select_competitor(room, player.id)
+            if competitor:
+                opponent_edges = _incoming_edges(room, competitor.id, neutral_ids)
+                competitor_edge = _pick_weighted_edge(opponent_edges, prefer_low_weight=False)
+            if competitor_edge is None:
+                boost_budget += sabotage_budget
+                sabotage_budget = 0
+
+        incoming = _incoming_edges(room, player.id, neutral_ids)
+        if not incoming:
+            incoming = _incoming_edges(room, player.id)
+        if not incoming:
+            fallback_edge = {"source": player.id, "target": player.id, "weight": 0.0}
+            node_edges.append(fallback_edge)
+            incoming = [fallback_edge]
+
+        boost_edge = _pick_weighted_edge(incoming, prefer_low_weight=True)
+        if boost_edge is None:
+            continue
+
+        boost_source = _node_label(room, boost_edge["source"])
+        boost_target = _node_label(room, boost_edge["target"])
+        boost_note = f"Boosted {boost_source}→{boost_target} by +{boost_budget} to fortify own inflow."
+
+        move_obj = Move(
+            id=next_move_id,
+            player_id=player.id,
+            source=boost_edge["source"],
+            target=boost_edge["target"],
+            weight_change=boost_budget,
+            note=boost_note,
+        )
+        room.moves.append(move_obj)
+        ai_moves_payload.append(move_obj.dict())
+        room.ai_move_notes[player.id].append(boost_note)
+        next_move_id += 1
+
+        if sabotage_budget > 0 and competitor_edge is not None:
+            competitor = next((p for p in room.players if p.id == competitor_edge["target"]), None)
+            competitor_name = competitor.name if competitor else _node_label(room, competitor_edge["target"])
+            sab_source = _node_label(room, competitor_edge["source"])
+            sab_target = _node_label(room, competitor_edge["target"])
+            sabotage_note = (
+                f"Weakened {competitor_name}'s inflow {sab_source}→{sab_target} by {sabotage_budget} to slow their score."
+            )
+            move_obj = Move(
+                id=next_move_id,
+                player_id=player.id,
+                source=competitor_edge["source"],
+                target=competitor_edge["target"],
+                weight_change=-sabotage_budget,
+                note=sabotage_note,
+            )
+            room.moves.append(move_obj)
+            ai_moves_payload.append(move_obj.dict())
+            room.ai_move_notes[player.id].append(sabotage_note)
+            next_move_id += 1
+
+        room.submitted_moves_points[player.id] = room.points_per_round_K
+        player.location = "Waiting"
+
+        if ai_moves_payload:
+            logger = get_room_logger(room.id)
+            logger.info(
+                "ai_moves",
+                extra={
+                    "ts": datetime.now().isoformat(timespec="milliseconds"),
+                    "round": room.turn,
+                    "player": player.id,
+                    "moves": ai_moves_payload,
+                },
+            )
 
 def get_room_safe(room_id: str) -> Room:
     if room_id not in rooms:
@@ -307,6 +453,7 @@ async def _calculate_scores_and_advance_turn(room_id: str):
         await broadcast_message(room_id, game_over_message)
         # Room deletion is handled via the DELETE /rooms/{room_id} endpoint
     else:
+        populate_ai_moves(room)
         await broadcast_message(room_id, {"type": "scores_calculated", "room": room.dict()})
 
 
@@ -323,10 +470,21 @@ class RoomCreate(BaseModel):
     num_non_player_nodes_M: int = 2
     points_per_round_K: int = 10
     max_turns_S: int = 10
+    ai_player_positions: List[int] = Field(default_factory=list)
 
 @app.post("/rooms", response_model=Room, status_code=201)
 @app.post("/rooms", response_model=Room, status_code=201)
 def create_room(room_data: RoomCreate):
+    # Validate AI designations before building the room
+    unique_ai_positions = sorted(set(room_data.ai_player_positions))
+    invalid_positions = [pos for pos in unique_ai_positions if pos < 1 or pos > room_data.num_players_N]
+    if invalid_positions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid ai_player_positions: {invalid_positions}."
+        )
+    ai_position_lookup = set(unique_ai_positions)
+
     new_room = Room(
         name=room_data.name,
         num_players_N=room_data.num_players_N,
@@ -355,6 +513,7 @@ def create_room(room_data: RoomCreate):
             id=pid,
             name=display_name,
             icon=icon_name,
+            is_ai=(i + 1) in ai_position_lookup,
             out_deg=(
                 new_room.num_non_player_nodes_M * 2
                 + new_room.num_players_N - 1) * INITIAL_POINT_WEIGHT,
@@ -443,6 +602,9 @@ def create_room(room_data: RoomCreate):
         adj_matrix[u, v] = weight
     new_room.turns["0"].adj_matrix = np.where(adj_matrix == 0.1, 0, adj_matrix).tolist()
 
+    # Auto-submit AI moves before exposing the room
+    populate_ai_moves(new_room)
+
     # Store the room
     rooms[new_room.id] = new_room
 
@@ -484,9 +646,11 @@ def get_room(room_id: str):
 async def submit_move(room_id: str, move_in: MoveIn):
     room = get_room_safe(room_id)
     # validate player
-    player_ids = {p.id for p in room.players}
-    if move_in.player_id not in player_ids:
+    player = next((p for p in room.players if p.id == move_in.player_id), None)
+    if player is None:
         raise HTTPException(status_code=404, detail="Player not found in this room")
+    if player.is_ai:
+        raise HTTPException(status_code=403, detail="AI players submit moves automatically")
     # validate points
     points_spent = abs(move_in.weight_change)
     current_spent = room.submitted_moves_points.get(move_in.player_id, 0)
@@ -513,6 +677,10 @@ async def submit_move(room_id: str, move_in: MoveIn):
 @app.post("/rooms/{room_id}/reset-moves", response_model=Room)
 async def reset_moves(room_id: str, request: ResetMovesRequest):
     room = get_room_safe(room_id)
+
+    target_player = next((p for p in room.players if p.id == request.player_id), None)
+    if target_player and target_player.is_ai:
+        raise HTTPException(status_code=400, detail="Cannot reset moves for an AI player")
 
     # Filter out moves by the specified player
     room.moves = [move for move in room.moves if move.player_id != request.player_id]
@@ -547,7 +715,7 @@ def ready_to_advance(room_id: str) -> bool:
     if not all(room.submitted_moves_points.get(p.id, 0) >= room.points_per_round_K for p in room.players):
         return False
     # must be on Waiting screen
-    if not all(p.location == "Waiting" for p in room.players):
+    if not all(p.location == "Waiting" for p in room.players if not p.is_ai):
         return False
     return True
 
@@ -594,6 +762,8 @@ async def update_player_location(
     room = get_room_safe(room_id)
     for p in room.players:
         if p.id == player_id:
+            if p.is_ai:
+                raise HTTPException(status_code=400, detail="AI player location is managed by the server")
             p.location = request.location
             # broadcast updated location
             await broadcast_message(room_id, {

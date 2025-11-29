@@ -17,7 +17,9 @@ export default function Trophy({ onRestart, room }) {
         </h1>
         <section className="text-center p-2">
           {/* Display only player nodes in header with updated scores */}
-          {room.players.map((p) => (
+          {room.players.map((p) => {
+            const noteText = p.is_ai ? (room.ai_move_notes?.[p.id]?.join(' / ') || 'AI controlled player') : '';
+            return (
             <span key={p.id} 
               className="
                 inline-flex items-center
@@ -25,11 +27,12 @@ export default function Trophy({ onRestart, room }) {
                 px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
               <img src={`/assets/nodes/${p.icon}`} 
                 alt={p.name} className="w-6 h-6" />
+              {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
               <span className="leading-none">
                 {Math.round((p.score ?? 0) * 100)}% 
               </span>
             </span>
-          ))}
+          );})}
         </section>
       </header>
 
@@ -43,15 +46,18 @@ export default function Trophy({ onRestart, room }) {
         <section className="relative flex-[2]">
           <p className="text-4xl p-4">{winner?.name} 🏆</p>
           <ul className="space-y-2"> 
-            {sortedPlayers.map((p, idx) => (
+            {sortedPlayers.map((p, idx) => {
+              const noteText = p.is_ai ? (room.ai_move_notes?.[p.id]?.join(' / ') || 'AI controlled player') : '';
+              return (
               <li key={p.id} className="
               inline-flex items-center 
               bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow pointer-events-none
               px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
                 <span>{`${idx + 1}. ${p.name} — ${Math.round((p.score ?? 0) * 100)}%`}</span>
+                {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
                 <img src={`/assets/nodes/${p.icon}`} alt={p.name} className="w-8 h-8" />
               </li>
-            ))}
+            );})}
           </ul>
         </section>
       </main>

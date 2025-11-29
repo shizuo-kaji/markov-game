@@ -29,6 +29,13 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
 
   // Dynamic nodes generated from room state
   const nodes = room.nodes || [];
+  const aiNotesMap = room.ai_move_notes || {};
+  const aiPlayers = room.players.filter((p) => p.is_ai);
+  const aiInsightEntries = aiPlayers.map((p) => ({
+    player: p,
+    notes: aiNotesMap[p.id] || []
+  }));
+  const hasAiInsight = aiInsightEntries.some((entry) => entry.notes.length);
 
   const [mode, setMode] = useState("endorse"); // endorse | sabotage
   const [value, setValue] = useState(0);       // slider value for current move
@@ -179,7 +186,9 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
         </h1>
         <section className="text-center p-2">
             {/* Display only player nodes in header with updated scores */}
-            {room.players.map((p) => (
+            {room.players.map((p) => {
+              const noteText = p.is_ai ? (aiNotesMap[p.id]?.join(' / ') || 'AI controlled player') : '';
+              return (
               <span key={p.id} 
                 className="
                   inline-flex items-center
@@ -187,13 +196,31 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
                   px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
                 <img src={`/assets/nodes/${p.icon}`} 
                   alt={p.name} className="w-6 h-6" />
+                {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
                 <span className="leading-none">
                   {Math.round((p.score ?? 0) * 100)}% 
                 </span>
               </span>
-            ))}
+            );})}
         </section>
       </header>
+
+      {aiPlayers.length > 0 && (
+        <section className="mx-3 mb-2 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-3 py-2 text-xs text-white/90">
+          <h2 className="text-sm font-semibold text-emerald-200">AI Insights</h2>
+          {hasAiInsight ? (
+            <ul className="mt-1 space-y-1">
+              {aiInsightEntries.map(({ player, notes }) => (
+                <li key={player.id}>
+                  <span className="font-semibold">{player.name}:</span> {notes.join(' / ')}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 italic">AI players are waiting to submit moves.</p>
+          )}
+        </section>
+      )}
 
       <main className="flex flex-col flex-1">
         <Board

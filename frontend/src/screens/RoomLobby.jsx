@@ -3,6 +3,9 @@ import ReturnButton from '../components/ReturnButton.jsx';
 
 export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRenamePlayer, onGameOver }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const selectedPlayer = room.players.find(p => p.id === selectedPlayerId);
+  const canStart = Boolean(selectedPlayerId && !selectedPlayer?.is_ai);
+  const aiNotesMap = room.ai_move_notes || {};
 
   // if game already finished, navigate immediately to Trophy
   useEffect(() => {
@@ -42,35 +45,52 @@ export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRen
         {/* Player selection with rename option */}
         <div className="pt-4 space-y-2">
           <h3 className="font-bold">Select your player:</h3>
-          {room.players.map((p) => (
-          <div
-            key={p.id}
-            className={`flex items-center h-12 justify-between ${
-              selectedPlayerId === p.id ? 'bg-emerald-200' : 'bg-emerald-800'
-            } rounded p-2 mb-2`}
-          >
-              <button
-                className={`flex-1 ml-2 font-bold ${selectedPlayerId === p.id ? 'text-emerald-900 text-[20px]' : 'text-white'}`}
-                onClick={() => setSelectedPlayerId(p.id)}
+          {room.players.map((p) => {
+            const isSelected = selectedPlayerId === p.id;
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center h-12 justify-between ${
+                  isSelected ? 'bg-emerald-200' : 'bg-emerald-800'
+                } rounded p-2 mb-2`}
               >
-                {p.name}
-              </button>
-              <button
-                type="button"
-                className="flex-shrink-0 ml-2 text-white hover:text-gray-200"
-                onClick={() => {
-                  const newName = window.prompt('Enter new name for ' + p.name, p.name);
-                  console.log('Renaming player:', p.id, 'to', newName);
-                  if (newName && newName !== p.name) {
-                    onRenamePlayer?.(p.id, newName);
-                  }
-                }}
-                title="Rename player"
-              >
-                ✏️
-              </button>
-            </div>
-          ))}
+                <button
+                  className={`flex-1 ml-2 font-bold text-left ${
+                    isSelected ? 'text-emerald-900 text-[20px]' : 'text-white'
+                  } ${p.is_ai ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  disabled={p.is_ai}
+                  onClick={() => {
+                    if (!p.is_ai) setSelectedPlayerId(p.id);
+                  }}
+                  title={p.is_ai ? 'AI players are computer-controlled' : 'Select this player'}
+                >
+                  {p.name}
+                </button>
+                {p.is_ai && (
+                  <span
+                    className="text-xs text-amber-300 font-semibold mr-2"
+                    title={aiNotesMap[p.id]?.join(' / ') || 'AI controlled player'}
+                  >
+                    🤖 AI
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="flex-shrink-0 ml-2 text-white hover:text-gray-200"
+                  onClick={() => {
+                    const newName = window.prompt('Enter new name for ' + p.name, p.name);
+                    console.log('Renaming player:', p.id, 'to', newName);
+                    if (newName && newName !== p.name) {
+                      onRenamePlayer?.(p.id, newName);
+                    }
+                  }}
+                  title="Rename player"
+                >
+                  ✏️
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex-1"></div>
@@ -78,8 +98,8 @@ export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRen
         {/* Start Game button */}
         <button
           className="relative h-12 bottom-2 bg-amber-300 text-orange-900 rounded p-2 font-bold hover:bg-amber-400 active:translate-y-0.5 disabled:opacity-20"
-          disabled={!selectedPlayerId}
-          onClick={() => onStart(selectedPlayerId)}
+          disabled={!canStart}
+          onClick={() => canStart && onStart(selectedPlayerId)}
         >
           START GAME
         </button>

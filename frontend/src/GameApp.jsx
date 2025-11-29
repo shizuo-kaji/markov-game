@@ -88,9 +88,14 @@ export default function GameApp() {
 
   // After selecting player in lobby, go to player screen
   const handleSelectPlayer = useCallback((playerId) => {
+    const target = selectedRoom?.players?.find((p) => p.id === playerId);
+    if (target?.is_ai) {
+      window.alert('AI players are controlled by the computer. Please pick a human player.');
+      return;
+    }
     setSelectedRoom(prev => ({ ...prev, mode: { player_id: playerId } }));
     setScreen("player");
-  }, []);
+  }, [selectedRoom]);
 
   // After fetching room details when entering a room, we set selectedRoom and screen
   // Add a handler for renaming players
