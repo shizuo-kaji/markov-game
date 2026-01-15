@@ -9,7 +9,7 @@ const K_MAX = 100;
 const S_MIN = 1;
 const S_MAX = 10;
 
-export default function CreateRoom({ onCreate }) {
+export default function CreateRoom({ onCreate, loading = false }) {
   const [name, setName] = useState("My Room");
   const [N, setN] = useState(2);
   const [M, setM] = useState(1);
@@ -29,6 +29,7 @@ export default function CreateRoom({ onCreate }) {
 
   const handleSubmit = e => {
     e.preventDefault();
+    if (loading) return;
     const aiPositions = aiFlags.reduce((acc, isAi, idx) => {
       if (isAi) acc.push(idx + 1); // backend expects 1-based positions
       return acc;
@@ -41,8 +42,6 @@ export default function CreateRoom({ onCreate }) {
       max_turns_S: S,
       ai_player_positions: aiPositions
     });
-    setName("");
-    setAiFlags(Array(N).fill(false));
   };
 
   const clampNumber = (value, min, max, fallback) => {
@@ -161,9 +160,14 @@ export default function CreateRoom({ onCreate }) {
 
         <button
           type="submit"
-          className="mt-2 h-12 bg-amber-300 text-orange-900 rounded p-2 font-bold hover:bg-amber-400 active:translate-y-0.5"
+          disabled={loading}
+          className={`mt-2 h-12 rounded p-2 font-bold ${
+            loading
+              ? 'bg-amber-200 text-orange-700 cursor-wait'
+              : 'bg-amber-300 text-orange-900 hover:bg-amber-400 active:translate-y-0.5'
+          }`}
         >
-          CREATE ROOM
+          {loading ? 'CREATING...' : 'CREATE ROOM'}
         </button>
       </form>
     </div>

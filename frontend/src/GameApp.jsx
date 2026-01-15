@@ -16,6 +16,11 @@ export default function GameApp() {
   const [lastTurnNumber, setLastTurnNumber] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
 
+  // Wake up backend on app startup (useful for cold-start servers)
+  useEffect(() => {
+    fetch(`${apiBase}/rooms`).catch(() => {});
+  }, [apiBase]);
+
   // Fetch rooms when on welcome screen
   const fetchRooms = useCallback(async () => {
     try {
