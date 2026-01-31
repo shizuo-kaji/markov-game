@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReturnButton from '../components/ReturnButton.jsx';
 
-export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRenamePlayer, onGameOver }) {
+export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDeleteRoom, onRenamePlayer, onGameOver }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const selectedPlayer = room.players.find(p => p.id === selectedPlayerId);
   const canStart = Boolean(selectedPlayerId && !selectedPlayer?.is_ai);
@@ -102,6 +102,14 @@ export default function RoomLobby({ room, onStart, onReturn, onDeleteRoom, onRen
           onClick={() => canStart && onStart(selectedPlayerId)}
         >
           START GAME
+        </button>
+
+        {/* Spectator button */}
+        <button
+          className="relative h-10 bottom-2 bg-stone-500 text-white rounded p-2 font-semibold hover:bg-stone-600 active:translate-y-0.5"
+          onClick={() => onSpectate?.()}
+        >
+          JOIN AS SPECTATOR
         </button>
       </aside>
 

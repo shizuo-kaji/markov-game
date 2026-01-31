@@ -27,26 +27,31 @@ export default function CreateRoom({ onCreate, loading = false }) {
     });
   }, [N]);
 
+  const clampNumber = (value, min, max, fallback) => {
+    if (Number.isNaN(value)) return fallback;
+    return Math.max(min, Math.min(max, value));
+  };
+
   const handleSubmit = e => {
     e.preventDefault();
     if (loading) return;
-    const aiPositions = aiFlags.reduce((acc, isAi, idx) => {
+    // Validate and clamp values on submit
+    const validN = clampNumber(N, N_MIN, N_MAX, 2);
+    const validM = clampNumber(M, M_MIN, M_MAX, 1);
+    const validK = clampNumber(K, K_MIN, K_MAX, 5);
+    const validS = clampNumber(S, S_MIN, S_MAX, 2);
+    const aiPositions = aiFlags.slice(0, validN).reduce((acc, isAi, idx) => {
       if (isAi) acc.push(idx + 1); // backend expects 1-based positions
       return acc;
     }, []);
     onCreate({
       name,
-      num_players_N: N,
-      num_non_player_nodes_M: M,
-      points_per_round_K: K,
-      max_turns_S: S,
+      num_players_N: validN,
+      num_non_player_nodes_M: validM,
+      points_per_round_K: validK,
+      max_turns_S: validS,
       ai_player_positions: aiPositions
     });
-  };
-
-  const clampNumber = (value, min, max, fallback) => {
-    if (Number.isNaN(value)) return fallback;
-    return Math.max(min, Math.min(max, value));
   };
 
   return (
@@ -78,7 +83,7 @@ export default function CreateRoom({ onCreate, loading = false }) {
               max={N_MAX}
               step={1}
               value={N}
-              onChange={e => setN(clampNumber(e.target.valueAsNumber, N_MIN, N_MAX, N))}
+              onChange={e => setN(e.target.valueAsNumber)}
               className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
               required
             />
@@ -91,7 +96,7 @@ export default function CreateRoom({ onCreate, loading = false }) {
               max={M_MAX}
               step={1}
               value={M}
-              onChange={e => setM(clampNumber(e.target.valueAsNumber, M_MIN, M_MAX, M))}
+              onChange={e => setM(e.target.valueAsNumber)}
               className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
               required
             />
@@ -107,7 +112,7 @@ export default function CreateRoom({ onCreate, loading = false }) {
               max={K_MAX}
               step={1}
               value={K}
-              onChange={e => setK(clampNumber(e.target.valueAsNumber, K_MIN, K_MAX, K))}
+              onChange={e => setK(e.target.valueAsNumber)}
               className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
             />
           </label>
@@ -119,7 +124,7 @@ export default function CreateRoom({ onCreate, loading = false }) {
               max={S_MAX}
               step={1}
               value={S}
-              onChange={e => setS(clampNumber(e.target.valueAsNumber, S_MIN, S_MAX, S))}
+              onChange={e => setS(e.target.valueAsNumber)}
               className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
               required
             />

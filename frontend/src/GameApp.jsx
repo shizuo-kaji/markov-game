@@ -8,6 +8,7 @@ import Waiting from "./screens/Waiting.jsx";
 import Trophy from "./screens/Trophy.jsx";
 import NewRoom from "./screens/NewRoom.jsx";
 import RoomLobby from "./screens/RoomLobby.jsx";
+import Spectator from "./screens/Spectator.jsx";
 
 export default function GameApp() {
   const apiBase = useApi();
@@ -98,9 +99,15 @@ export default function GameApp() {
       window.alert('AI players are controlled by the computer. Please pick a human player.');
       return;
     }
-    setSelectedRoom(prev => ({ ...prev, mode: { player_id: playerId } }));
+    setSelectedRoom(prev => ({ ...prev, mode: { player_id: playerId, spectator: false } }));
     setScreen("player");
   }, [selectedRoom]);
+
+  // Join as spectator
+  const handleSpectate = useCallback(() => {
+    setSelectedRoom(prev => ({ ...prev, mode: { player_id: null, spectator: true } }));
+    setScreen("spectator");
+  }, []);
 
   // After fetching room details when entering a room, we set selectedRoom and screen
   // Add a handler for renaming players
@@ -183,9 +190,10 @@ export default function GameApp() {
         />
       )}
       {screen === "lobby" && selectedRoom && (
-        <RoomLobby 
-          room={selectedRoom} 
+        <RoomLobby
+          room={selectedRoom}
           onStart={handleSelectPlayer}
+          onSpectate={handleSpectate}
           onGameOver={handleGameOver}
           onDeleteRoom={(id) => { handleDeleteRoom(id); setScreen("welcome"); }}
           onReturn={() => setScreen("welcome")}
@@ -208,6 +216,13 @@ export default function GameApp() {
           onGameOver={handleGameOver}
           onReturn={() => setScreen("welcome")}
           turnNumber={lastTurnNumber}
+        />
+      )}
+      {screen === "spectator" && selectedRoom && (
+        <Spectator
+          room={selectedRoom}
+          onGameOver={handleGameOver}
+          onReturn={() => setScreen("welcome")}
         />
       )}
       {screen === "trophy" && selectedRoom && (

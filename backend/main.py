@@ -163,6 +163,7 @@ class Room(BaseModel):
     submitted_moves_points: Dict[str, int] = {}
     ai_move_notes: Dict[str, List[str]] = Field(default_factory=dict)
     turns: Dict[str, Turn] = {}
+    moves_history: Dict[int, List[Move]] = Field(default_factory=dict)  # moves grouped by turn number
 
 # --- In-memory database ---
 rooms: Dict[str, Room] = {}
@@ -416,7 +417,10 @@ async def _calculate_scores_and_advance_turn(room_id: str):
     )
     # -------------------------------------------------------------------------
 
-    # 5. Reset for next turn
+    # 5. Save moves to history before reset
+    room.moves_history[room.turn] = list(room.moves)
+
+    # 6. Reset for next turn
     room.moves = []
     room.turn += 1
     room.submitted_moves_points = {}
