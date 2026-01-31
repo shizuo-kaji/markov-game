@@ -40,9 +40,19 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
         ))}
 
         <div className="flex-1"></div>
-        <button onClick={() => setShowHelp(true)}>
-        ❔ Help
-        </button>
+        <div className="flex gap-4 mb-2">
+          <button onClick={() => setShowHelp(true)}>
+            Help
+          </button>
+          <a
+            href="https://github.com/shizuo-kaji/markov-game"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-stone-300 hover:text-white"
+          >
+            GitHub
+          </a>
+        </div>
         {showHelp && (
           <Help onReturn={() => setShowHelp(false)} />
         )}
