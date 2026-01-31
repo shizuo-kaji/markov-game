@@ -6,8 +6,19 @@
 [IMI福岡県立高校生対象アウトリーチ「Math for the Future」](https://www.imi.kyushu-u.ac.jp/post-17364/)：「数式で未来をのぞく 〜シンプル・ルールでシミュレーション〜」
 のために作成されました。
 
-[こちらからお試しプレイできます](https://markov-game-frontend.onrender.com/)
-"Create New Room" の際，バックエンド起動まで30秒くらい時間がかかる場合があります．焦らずお待ちを．
+---
+
+## 今すぐ遊ぶ
+
+**[こちらからお試しプレイできます](https://markov-game-frontend.onrender.com/)**
+
+<a href="https://markov-game-frontend.onrender.com/">
+  <img src="https://github.com/shizuo-kaji/markov-game/blob/main/images/QR.png?raw=true" alt="QRコード" width="150">
+</a>
+
+> **Note**: 初回アクセス時や "Create New Room" の際、バックエンドの起動に30秒ほどかかる場合があります。しばらくお待ちください。
+
+---
 
 また、理解の補助として[マルコフチェーンシミュレーター](https://shizuo-kaji.github.io/markov-simple/)もご参照ください。
 
@@ -16,7 +27,11 @@
 
 created by Shizuo KAJI and Sebastian Elias Graiff Zurita
 
-![ゲームプレイ画面](https://github.com/shizuo-kaji/markov-game/blob/main/images/playscreen.jpg?raw=true)
+## スクリーンショット
+
+| スタート画面 | プレイ画面 | 結果画面 |
+|:---:|:---:|:---:|
+| ![スタート](https://github.com/shizuo-kaji/markov-game/blob/main/images/start.jpg?raw=true) | ![プレイ](https://github.com/shizuo-kaji/markov-game/blob/main/images/playscreen.jpg?raw=true) | ![結果](https://github.com/shizuo-kaji/markov-game/blob/main/images/end.jpg?raw=true) |
 
 ## 概要
 
