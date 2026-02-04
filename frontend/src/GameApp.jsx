@@ -16,10 +16,23 @@ export default function GameApp() {
   const [rooms, setRooms] = useState([]);  // list of available rooms
   const [lastTurnNumber, setLastTurnNumber] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [serverStatus, setServerStatus] = useState("connecting"); // "connecting" | "online" | "offline"
 
   // Wake up backend on app startup (useful for cold-start servers)
   useEffect(() => {
-    fetch(`${apiBase}/rooms`).catch(() => {});
+    let isMounted = true;
+    const checkServer = async () => {
+      try {
+        const res = await fetch(`${apiBase}/rooms`);
+        if (isMounted) {
+          setServerStatus(res.ok ? "online" : "offline");
+        }
+      } catch {
+        if (isMounted) setServerStatus("offline");
+      }
+    };
+    checkServer();
+    return () => { isMounted = false; };
   }, [apiBase]);
 
   // Fetch rooms when on welcome screen
@@ -176,11 +189,18 @@ export default function GameApp() {
   return (
     <>
       {screen === "welcome" && (
-        <Welcome 
+        <Welcome
           rooms={rooms}
           onEnterRoom={handleEnterRoom}
           onDeleteRoom={handleDeleteRoom}
           onCreateRoom={() => setScreen("new")}
+          serverStatus={serverStatus}
+          onRetryConnection={() => {
+            setServerStatus("connecting");
+            fetch(`${apiBase}/rooms`)
+              .then(res => setServerStatus(res.ok ? "online" : "offline"))
+              .catch(() => setServerStatus("offline"));
+          }}
         />
       )}
       {screen === "new" && (
