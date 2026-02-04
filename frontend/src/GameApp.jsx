@@ -19,13 +19,30 @@ export default function GameApp() {
   const [serverStatus, setServerStatus] = useState("connecting"); // "connecting" | "online" | "offline"
 
   // Wake up backend on app startup (useful for cold-start servers)
+  // Also pre-create a warmup room to speed up first room creation
   useEffect(() => {
     let isMounted = true;
     const checkServer = async () => {
       try {
         const res = await fetch(`${apiBase}/rooms`);
         if (isMounted) {
-          setServerStatus(res.ok ? "online" : "offline");
+          if (res.ok) {
+            setServerStatus("online");
+            // Create a warmup room in the background to pre-warm room creation
+            fetch(`${apiBase}/rooms`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: "__warmup__",
+                num_players_N: 2,
+                num_non_player_nodes_M: 0,
+                points_per_round_K: 5,
+                max_turns_S: 2,
+              }),
+            }).catch(() => {}); // Ignore errors, this is just a warmup
+          } else {
+            setServerStatus("offline");
+          }
         }
       } catch {
         if (isMounted) setServerStatus("offline");
@@ -35,13 +52,14 @@ export default function GameApp() {
     return () => { isMounted = false; };
   }, [apiBase]);
 
-  // Fetch rooms when on welcome screen
+  // Fetch rooms when on welcome screen (filter out warmup rooms)
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch(`${apiBase}/rooms`);
       if (!res.ok) throw new Error(`Error fetching rooms: ${res.status}`);
       const data = await res.json();
-      setRooms(data);
+      // Filter out hidden warmup rooms
+      setRooms(data.filter(r => r.name !== "__warmup__"));
     } catch (err) {
       console.error("Error fetching rooms:", err);
     }
