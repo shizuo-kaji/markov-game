@@ -12,7 +12,7 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
   const status = statusConfig[serverStatus] || statusConfig.connecting;
 
   return (
-    <div 
+    <div
       className="appWelcome"
     >
       {/* Left panel */}
@@ -22,7 +22,7 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
           p-2 
           font-bold font-serif 
           drop-shadow"
-        > Markovian<br />Royale </h1>
+        > Markovian<br />Town </h1>
         <img src={"/assets/background/game_clean.png"} alt="logo" className="w-80 h-80" />
 
         {/* Server status indicator */}
@@ -78,11 +78,10 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
           <Help onReturn={() => setShowHelp(false)} />
         )}
         <button
-          className={`relative h-12 bottom-2 rounded p-2 font-bold active:translate-y-0.5 ${
-            serverStatus === "online"
+          className={`relative h-12 bottom-2 rounded p-2 font-bold active:translate-y-0.5 ${serverStatus === "online"
               ? "bg-amber-300 text-orange-900 hover:bg-amber-400"
               : "bg-stone-500 text-stone-300 cursor-not-allowed"
-          }`}
+            }`}
           onClick={onCreateRoom}
           disabled={serverStatus !== "online"}
         >

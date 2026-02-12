@@ -31,17 +31,17 @@ export default function NewRoom({ onCreate, onReturn }) {
   };
 
   return (
-  <div 
+    <div
       className="appWelcome"
     >
       <aside className="sidePanel">
-      <h1 className="
+        <h1 className="
         text-5xl 
         p-2 
         font-bold font-serif 
         drop-shadow"
-      > Markovian<br />Royale </h1>
-      <CreateRoom onCreate={handleCreate} loading={loading} />
+        > Markovian<br />Town </h1>
+        <CreateRoom onCreate={handleCreate} loading={loading} />
       </aside>
       <ReturnButton onClick={onReturn} />
     </div>

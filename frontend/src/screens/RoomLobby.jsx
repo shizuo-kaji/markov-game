@@ -13,7 +13,7 @@ export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDelet
   }, [room, onGameOver]);
 
   return (
-  <div 
+    <div
       className="appWelcome"
     >
       {/* Left panel */}
@@ -23,7 +23,7 @@ export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDelet
           p-2 
           font-bold font-serif 
           drop-shadow"
-        > Markovian<br />Royale </h1>
+        > Markovian<br />Town </h1>
         {/* Room title card */}
         <div className="flex items-center h-12 justify-between bg-emerald-600/20 rounded p-2 hover:bg-emerald-600 mb-2">
           <span className="flex-1 ml-2 text-white font-bold text-lg">{room.name}</span>
@@ -50,14 +50,12 @@ export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDelet
             return (
               <div
                 key={p.id}
-                className={`flex items-center h-12 justify-between ${
-                  isSelected ? 'bg-emerald-200' : 'bg-emerald-800'
-                } rounded p-2 mb-2`}
+                className={`flex items-center h-12 justify-between ${isSelected ? 'bg-emerald-200' : 'bg-emerald-800'
+                  } rounded p-2 mb-2`}
               >
                 <button
-                  className={`flex-1 ml-2 font-bold text-left ${
-                    isSelected ? 'text-emerald-900 text-[20px]' : 'text-white'
-                  } ${p.is_ai ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`flex-1 ml-2 font-bold text-left ${isSelected ? 'text-emerald-900 text-[20px]' : 'text-white'
+                    } ${p.is_ai ? 'opacity-60 cursor-not-allowed' : ''}`}
                   disabled={p.is_ai}
                   onClick={() => {
                     if (!p.is_ai) setSelectedPlayerId(p.id);
