@@ -9,6 +9,41 @@ const K_MAX = 100;
 const S_MIN = 1;
 const S_MAX = 10;
 
+function NumberStepper({ label, value, min, max, onChange }) {
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+
+  return (
+    <div className="flex flex-col gap-1 text-sm font-semibold">
+      <span>{label}</span>
+      <div className="flex items-center rounded border border-gray-300 bg-stone-200 text-black">
+        <button
+          type="button"
+          onClick={() => onChange(value - 1)}
+          disabled={!canDecrease}
+          className="h-10 w-10 rounded-l bg-stone-300 text-lg font-bold hover:bg-stone-400 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={`Decrease ${label}`}
+        >
+          −
+        </button>
+        <div className="flex h-10 flex-1 items-center justify-center border-x border-gray-300 text-base font-bold">
+          {value}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          disabled={!canIncrease}
+          className="h-10 w-10 rounded-r bg-stone-300 text-lg font-bold hover:bg-stone-400 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={`Increase ${label}`}
+        >
+          +
+        </button>
+      </div>
+      <span className="text-[11px] text-stone-200/80">Range: {min} - {max}</span>
+    </div>
+  );
+}
+
 export default function CreateRoom({ onCreate, loading = false }) {
   const [name, setName] = useState("My Room");
   const [N, setN] = useState(2);
@@ -31,6 +66,19 @@ export default function CreateRoom({ onCreate, loading = false }) {
     if (Number.isNaN(value)) return fallback;
     return Math.max(min, Math.min(max, value));
   };
+
+  const stepValue = (setter, min, max, fallback) => (nextValue) => {
+    setter(prev => {
+      const base = Number.isFinite(prev) ? prev : fallback;
+      const target = Number.isFinite(nextValue) ? nextValue : base;
+      return Math.max(min, Math.min(max, target));
+    });
+  };
+
+  const setPlayers = stepValue(setN, N_MIN, N_MAX, 2);
+  const setNeutrals = stepValue(setM, M_MIN, M_MAX, 1);
+  const setPoints = stepValue(setK, K_MIN, K_MAX, 5);
+  const setRounds = stepValue(setS, S_MIN, S_MAX, 2);
 
   const handleSubmit = e => {
     e.preventDefault();
@@ -75,60 +123,13 @@ export default function CreateRoom({ onCreate, loading = false }) {
         </label>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            <span>Players (N)</span>
-            <input
-              type="number"
-              min={N_MIN}
-              max={N_MAX}
-              step={1}
-              value={N}
-              onChange={e => setN(e.target.valueAsNumber)}
-              className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            <span>Neutral Nodes (M)</span>
-            <input
-              type="number"
-              min={M_MIN}
-              max={M_MAX}
-              step={1}
-              value={M}
-              onChange={e => setM(e.target.valueAsNumber)}
-              className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
-              required
-            />
-          </label>
+          <NumberStepper label="Players (N)" value={N} min={N_MIN} max={N_MAX} onChange={setPlayers} />
+          <NumberStepper label="Neutral Nodes (M)" value={M} min={M_MIN} max={M_MAX} onChange={setNeutrals} />
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            <span>Points per Round (K)</span>
-            <input
-              type="number"
-              min={K_MIN}
-              max={K_MAX}
-              step={1}
-              value={K}
-              onChange={e => setK(e.target.valueAsNumber)}
-              className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            <span>Rounds (S)</span>
-            <input
-              type="number"
-              min={S_MIN}
-              max={S_MAX}
-              step={1}
-              value={S}
-              onChange={e => setS(e.target.valueAsNumber)}
-              className="p-2 bg-stone-200 rounded border border-gray-300 text-black"
-              required
-            />
-          </label>
+          <NumberStepper label="Points per Round (K)" value={K} min={K_MIN} max={K_MAX} onChange={setPoints} />
+          <NumberStepper label="Rounds (S)" value={S} min={S_MIN} max={S_MAX} onChange={setRounds} />
         </div>
 
         <div className="rounded border border-emerald-500/40 bg-emerald-950/30 p-3">

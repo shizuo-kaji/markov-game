@@ -90,7 +90,7 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
       </aside>
 
       {/* Placeholder map */}
-      <main className="flex-1 relative">
+      <main className="relative hidden flex-1 md:block">
       </main>
     </div>
   );

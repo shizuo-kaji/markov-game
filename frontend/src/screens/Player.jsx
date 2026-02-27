@@ -2,8 +2,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import Board from "../components/Board.jsx";
 import Ledger from "../components/Ledger.jsx";
+import AiInsightsPanel from "../components/AiInsightsPanel.jsx";
+import NodeIcon from "../components/NodeIcon.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
 import { useApi } from '../../apiConfig.js';
+import { getPreviousRoundAiNotes } from "../utils/aiInsights.js";
 
 export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn }) {
   const apiBase = useApi();
@@ -29,13 +32,8 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
 
   // Dynamic nodes generated from room state
   const nodes = room.nodes || [];
-  const aiNotesMap = room.ai_move_notes || {};
+  const { previousRound, notesByPlayer: aiNotesMap } = getPreviousRoundAiNotes(room);
   const aiPlayers = room.players.filter((p) => p.is_ai);
-  const aiInsightEntries = aiPlayers.map((p) => ({
-    player: p,
-    notes: aiNotesMap[p.id] || []
-  }));
-  const hasAiInsight = aiInsightEntries.some((entry) => entry.notes.length);
 
   const [mode, setMode] = useState("endorse"); // endorse | sabotage
   const [value, setValue] = useState(0);       // slider value for current move
@@ -91,6 +89,7 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
   const pointsUsed    = moves.reduce((s, m) => s + m.value, 0);
   const totalPoints   = room.points_per_round_K ?? 0;
   const remainingAll  = totalPoints - pointsUsed;
+  const remainingPercent = totalPoints > 0 ? Math.max(0, (remainingAll / totalPoints) * 100) : 0;
   const turnComplete  = remainingAll === 0 && value === 0; // since selection is inside Board
 
   // Submit current selection as a move via API
@@ -180,11 +179,11 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
 
   return (
     <div className="appBackground">
-      <header className="bg-stone-100/80">
+      <header className="shrink-0 bg-stone-100/80">
         <h1 className="font-bold text-center text-xl p-2">
           {playerName} (Round {room.turn}/{room.max_turns_S} )
         </h1>
-        <section className="text-center p-2">
+        <section className="flex flex-wrap justify-center gap-1 p-2">
             {/* Display only player nodes in header with updated scores */}
             {room.players.map((p) => {
               const noteText = p.is_ai ? (aiNotesMap[p.id]?.join(' / ') || 'AI controlled player') : '';
@@ -194,8 +193,7 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
                   inline-flex items-center
                   bg-stone-100/90 rounded-lg border-2 border-black 
                   px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
-                <img src={`/assets/nodes/${p.icon}`} 
-                  alt={p.name} className="w-6 h-6" />
+                <NodeIcon icon={p.icon} alt={p.name} className="w-6 h-6" />
                 {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
                 <span className="leading-none">
                   {Math.round((p.score ?? 0) * 100)}% 
@@ -205,27 +203,17 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
         </section>
       </header>
 
-      {aiPlayers.length > 0 && (
-        <section className="mx-3 mb-2 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-3 py-2 text-xs text-white/90">
-          <h2 className="text-sm font-semibold text-emerald-200">AI Insights</h2>
-          {hasAiInsight ? (
-            <ul className="mt-1 space-y-1">
-              {aiInsightEntries.map(({ player, notes }) => (
-                <li key={player.id}>
-                  <span className="font-semibold">{player.name}:</span> {notes.join(' / ')}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 italic">AI players are waiting to submit moves.</p>
-          )}
-        </section>
-      )}
+      <AiInsightsPanel
+        aiPlayers={aiPlayers}
+        notesByPlayer={aiNotesMap}
+        previousRound={previousRound}
+        emptyMessage="No previous-round AI insights yet."
+      />
 
-      <main className="flex flex-col flex-1">
+      <main className="flex min-h-0 flex-1 flex-col">
         <Board
           as="section"
-          className="relative flex-[8] border-t-2 border-b-2"
+          className="relative min-h-0 flex-[8] border-t-2 border-b-2"
           ref={boardRef}
           nodes={nodes}
           bgModeColor={bgModeColor}
@@ -234,12 +222,12 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
           currentRoom={room}
           playMode={mode}
         />
-        <section className="relative flex-[2]">
+        <section className="relative min-h-[52px] flex-[2] overflow-hidden">
           <Ledger ledger={ledgerEntries} getNode={getNode} />
         </section>
       </main>
 
-      <footer className="h-60 flex flex-col bg-stone-100/80 p-4 space-y-2">
+      <footer className="shrink-0 flex min-h-[180px] flex-col bg-stone-100/80 p-3 space-y-2 sm:h-60 sm:p-4 overflow-y-auto">
         <div className="h-20 flex justify-end space-x-2">
           <button
             className="flex flex-1 flex-col items-center justify-center px-2 py-2 rounded"
@@ -266,7 +254,7 @@ export default function PlayerTurn({ room, currentPlayerId, onEndTurn, onReturn 
             value={value}
             disabled={remainingAll === 0}
             onChange={(e) => setValue(+e.target.value)}
-            style={{ width: `${(remainingAll/room.points_per_round_K)*100}%`, accentColor: bgModeColor }}
+            style={{ width: `${remainingPercent}%`, accentColor: bgModeColor }}
             className="w-full max-w-[100%] disabled:opacity-50"
         />
 

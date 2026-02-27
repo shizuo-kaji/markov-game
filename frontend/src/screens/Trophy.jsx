@@ -1,10 +1,56 @@
 import { useState, useMemo } from "react";
-import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
+import NodeIcon from "../components/NodeIcon.jsx";
+
+function computeStationaryScores(adjMatrix, nodeIds) {
+  if (!adjMatrix || adjMatrix.length === 0 || !nodeIds || nodeIds.length !== adjMatrix.length) {
+    return null;
+  }
+
+  const n = adjMatrix.length;
+  const transition = Array.from({ length: n }, () => Array(n).fill(0));
+
+  // Match backend behavior: each existing weight has a tiny positive floor.
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      transition[i][j] = Math.max(0.01, Number(adjMatrix[i][j] ?? 0));
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const rowSum = transition[i].reduce((acc, value) => acc + value, 0) || 1;
+    for (let j = 0; j < n; j++) {
+      transition[i][j] /= rowSum;
+    }
+  }
+
+  // Power iteration for the stationary distribution
+  let dist = Array(n).fill(1 / n);
+  for (let iter = 0; iter < 400; iter++) {
+    const next = Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      let value = 0;
+      for (let i = 0; i < n; i++) {
+        value += dist[i] * transition[i][j];
+      }
+      next[j] = value;
+    }
+    const diff = next.reduce((acc, value, idx) => acc + Math.abs(value - dist[idx]), 0);
+    dist = next;
+    if (diff < 1e-11) break;
+  }
+
+  const total = dist.reduce((acc, value) => acc + value, 0) || 1;
+  const normalized = dist.map((value) => value / total);
+
+  return nodeIds.reduce((acc, nodeId, idx) => {
+    acc[nodeId] = normalized[idx];
+    return acc;
+  }, {});
+}
 
 
 export default function Trophy({ onRestart, room }) {
-  const apiBase = useApi();
   const [selectedTurn, setSelectedTurn] = useState(room.max_turns_S); // Start at final turn
   const [showReview, setShowReview] = useState(false);
 
@@ -12,40 +58,13 @@ export default function Trophy({ onRestart, room }) {
   const sortedPlayers = [...room.players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const winner = sortedPlayers[0];
 
-  // Get all turns as array (room.turns is an object keyed by turn number)
-  const turnsArray = useMemo(() => {
-    if (!room.turns) return [];
-    return Object.entries(room.turns)
-      .map(([turnNum, turnData]) => ({ turnNum: parseInt(turnNum), ...turnData }))
-      .sort((a, b) => a.turnNum - b.turnNum);
-  }, [room.turns]);
-
-  // Get moves history (room.moves_history contains moves grouped by turn)
-  const movesHistory = room.moves_history || {};
-
-  // Compute scores for each turn based on adjacency matrix
-  const computeScoresFromMatrix = (adjMatrix, nodeCount) => {
-    if (!adjMatrix || adjMatrix.length === 0) return null;
-    // Normalize columns to create transition matrix
-    const n = adjMatrix.length;
-    const colSums = Array(n).fill(0);
-    for (let j = 0; j < n; j++) {
-      for (let i = 0; i < n; i++) {
-        colSums[j] += adjMatrix[i][j];
-      }
-    }
-    // Compute stationary distribution (simplified: use column sums as proxy)
-    const total = colSums.reduce((a, b) => a + b, 0);
-    if (total === 0) return Array(n).fill(1 / n);
-    return colSums.map(s => s / total);
-  };
-
   // Get scores at selected turn
   const scoresAtTurn = useMemo(() => {
     const turnData = room.turns?.[selectedTurn];
-    if (!turnData?.adj_matrix) return null;
-    return computeScoresFromMatrix(turnData.adj_matrix, room.nodes?.length || 0);
-  }, [selectedTurn, room.turns, room.nodes]);
+    const nodeIds = room.graph?.nodes?.map((node) => node.id) || [];
+    if (!turnData?.adj_matrix?.length || !nodeIds.length) return null;
+    return computeStationaryScores(turnData.adj_matrix, nodeIds);
+  }, [selectedTurn, room.turns, room.graph]);
 
   // Create a modified room object for the selected turn
   const roomAtTurn = useMemo(() => {
@@ -54,13 +73,13 @@ export default function Trophy({ onRestart, room }) {
     if (!turnData) return room;
 
     // Update player/neutral scores if we have computed scores
-    const updatedPlayers = room.players.map((p, idx) => ({
+    const updatedPlayers = room.players.map((p) => ({
       ...p,
-      score: scoresAtTurn ? scoresAtTurn[idx] : p.score
+      score: scoresAtTurn?.[p.id] ?? p.score
     }));
-    const updatedNeutrals = room.neutrals.map((n, idx) => ({
+    const updatedNeutrals = room.neutrals.map((n) => ({
       ...n,
-      score: scoresAtTurn ? scoresAtTurn[room.players.length + idx] : n.score
+      score: scoresAtTurn?.[n.id] ?? n.score
     }));
     const updatedNodes = [
       ...updatedPlayers.map(p => ({
@@ -86,8 +105,9 @@ export default function Trophy({ onRestart, room }) {
 
   // Get moves for the selected turn
   const movesAtTurn = useMemo(() => {
-    return movesHistory[selectedTurn] || [];
-  }, [movesHistory, selectedTurn]);
+    const movesHistory = room.moves_history ?? {};
+    return movesHistory[selectedTurn] || movesHistory[String(selectedTurn)] || [];
+  }, [room.moves_history, selectedTurn]);
 
   // Helper to get node name by id
   const getNodeName = (nodeId) => {
@@ -111,8 +131,7 @@ export default function Trophy({ onRestart, room }) {
                 inline-flex items-center
                 bg-stone-100/90 rounded-lg border-2 border-black
                 px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
-              <img src={`/assets/nodes/${p.icon}`}
-                alt={p.name} className="w-6 h-6" />
+              <NodeIcon icon={p.icon} alt={p.name} className="w-6 h-6" />
               {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
               <span className="leading-none">
                 {Math.round((p.score ?? 0) * 100)}%
@@ -169,7 +188,7 @@ export default function Trophy({ onRestart, room }) {
                   return (
                     <div key={p.id} className="bg-stone-700/50 rounded p-2">
                       <div className="flex items-center gap-2 mb-1">
-                        <img src={`/assets/nodes/${p.icon}`} alt={p.name} className="w-4 h-4" />
+                        <NodeIcon icon={p.icon} alt={p.name} className="w-4 h-4" />
                         <span className="text-white text-sm font-semibold">{p.name}</span>
                         {p.is_ai && <span className="text-xs text-amber-300">🤖</span>}
                       </div>
@@ -214,7 +233,7 @@ export default function Trophy({ onRestart, room }) {
                 px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
                   <span>{`${idx + 1}. ${p.name} — ${Math.round((p.score ?? 0) * 100)}%`}</span>
                   {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
-                  <img src={`/assets/nodes/${p.icon}`} alt={p.name} className="w-8 h-8" />
+                  <NodeIcon icon={p.icon} alt={p.name} className="w-8 h-8" />
                 </li>
               );})}
             </ul>

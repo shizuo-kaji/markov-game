@@ -1,8 +1,11 @@
 // Waiting.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
+import AiInsightsPanel from "../components/AiInsightsPanel.jsx";
+import NodeIcon from "../components/NodeIcon.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
+import { getPreviousRoundAiNotes } from "../utils/aiInsights.js";
 
 function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turnNumber }) {
   const apiBase = useApi();
@@ -89,12 +92,8 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
       in_deg: n.in_deg
     }))
   ];
-  const aiNotesMap = currentRoom.ai_move_notes || {};
+  const { previousRound, notesByPlayer: aiNotesMap } = getPreviousRoundAiNotes(currentRoom);
   const aiPlayers = currentRoom.players.filter((p) => p.is_ai);
-  const aiInsightEntries = aiPlayers.map((p) => ({
-    player: p,
-    notes: aiNotesMap[p.id] || []
-  }));
 
   // derive if this is the final turn for UI messaging
   const isLastTurn = currentRoom.turn > currentRoom.max_turns_S
@@ -139,11 +138,11 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
   /* --- render ---------------------------------------------------------- */
   return (
     <div className="appBackground">
-      <header className="bg-stone-100/80">
+      <header className="shrink-0 bg-stone-100/80">
         <h1 className="font-bold text-center text-xl p-2">
           {currentRoom.name}
         </h1>
-        <section className="text-center p-2">
+        <section className="flex flex-wrap justify-center gap-1 p-2">
           {/* Display only player nodes with their scores */}
           {currentRoom.players.map((p) => {
             const noteText = p.is_ai ? (aiNotesMap[p.id]?.join(' / ') || 'AI controlled player') : '';
@@ -153,8 +152,7 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
                 inline-flex items-center
                 bg-stone-100/90 rounded-lg border-2 border-black 
                 px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
-              <img src={`/assets/nodes/${p.icon}`} 
-                alt={p.name} className="w-6 h-6" />
+              <NodeIcon icon={p.icon} alt={p.name} className="w-6 h-6" />
               {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
               <span className="leading-none">
                 {Math.round((p.score ?? 0) * 100)}% 
@@ -164,32 +162,22 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         </section>
       </header>
 
-      {aiPlayers.length > 0 && (
-        <section className="mx-3 mb-2 rounded-lg border border-emerald-500/50 bg-emerald-900/20 px-3 py-2 text-xs text-white/90">
-          <h2 className="text-sm font-semibold text-emerald-200">AI Insights</h2>
-          {aiInsightEntries.some(entry => entry.notes.length) ? (
-            <ul className="mt-1 space-y-1">
-              {aiInsightEntries.map(({ player, notes }) => (
-                <li key={player.id}>
-                  <span className="font-semibold">{player.name}:</span> {notes.join(' / ')}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 italic">AI players are queueing their plans.</p>
-          )}
-        </section>
-      )}
+      <AiInsightsPanel
+        aiPlayers={aiPlayers}
+        notesByPlayer={aiNotesMap}
+        previousRound={previousRound}
+        emptyMessage="No previous-round AI insights yet."
+      />
 
-      <main className="flex flex-col flex-1">
+      <main className="flex min-h-0 flex-1 flex-col">
         <Board
           as="section"
-          className="relative flex-[8]"
+          className="relative min-h-0 flex-[8]"
           nodes={nodes}
           currentRoom={currentRoom}
           playMode="wait"
         />
-        <section className="relative flex-[2] bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow text-[9px]">
+        <section className="relative min-h-[52px] flex-[2] overflow-y-auto bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow text-[9px]">
           <ul className="list-none grid grid-cols-2 gap-x-4 gap-y-1">
              {currentRoom.players.map(p => {
                const spent = currentRoom.submitted_moves_points[p.id] || 0;
@@ -212,7 +200,7 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
          </section>
       </main>
 
-      <footer className="h-60 flex flex-col items-center justify-center bg-stone-100/80 p-4">
+      <footer className="shrink-0 flex min-h-[180px] flex-col items-center justify-center bg-stone-100/80 p-3 sm:h-60 sm:p-4">
         <img src="/assets/background/wait2_clean.png" alt="logo" className="w-[150px] h-[120px]" />
         <div className="flex items-center justify-center">
         {turnCompleted ? (

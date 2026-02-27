@@ -209,8 +209,76 @@ def _node_label(room: Room, node_id: str) -> str:
     return node_id
 
 
+def _effective_edge_weights(room: Room) -> Dict[tuple[str, str], float]:
+    """Current graph weights plus already submitted (pending) moves."""
+    weights: Dict[tuple[str, str], float] = {}
+    for edge in room.graph.get("edges", []):
+        key = (edge["source"], edge["target"])
+        weights[key] = float(edge.get("weight", 0.0))
+
+    for move in room.moves:
+        key = (move.source, move.target)
+        if key not in weights:
+            continue
+        weights[key] = max(0.0, weights[key] + float(move.weight_change))
+    return weights
+
+
+def _stationary_distribution_from_weights(
+    room: Room,
+    edge_weights: Dict[tuple[str, str], float]
+) -> Dict[str, float]:
+    """Compute stationary distribution for a weighted directed graph."""
+    node_ids = [node["id"] for node in room.graph.get("nodes", [])]
+    if not node_ids:
+        return {}
+    node_index = {node_id: i for i, node_id in enumerate(node_ids)}
+    n = len(node_ids)
+
+    adj_matrix = np.zeros((n, n), dtype=float)
+    for (source, target), weight in edge_weights.items():
+        u = node_index.get(source)
+        v = node_index.get(target)
+        if u is None or v is None:
+            continue
+        # Match score-calculation behavior: all edges have a tiny positive floor.
+        adj_matrix[u, v] = max(0.01, float(weight))
+
+    row_sums = adj_matrix.sum(axis=1, keepdims=True)
+    row_sums[row_sums == 0] = 1.0
+    transition = adj_matrix / row_sums
+
+    # Power iteration on row-stochastic matrix for robust/speedy evaluation.
+    dist = np.full(n, 1.0 / n, dtype=float)
+    for _ in range(300):
+        nxt = dist @ transition
+        if np.linalg.norm(nxt - dist, ord=1) < 1e-11:
+            dist = nxt
+            break
+        dist = nxt
+
+    total = float(dist.sum())
+    if not np.isfinite(total) or total <= 0:
+        dist = np.full(n, 1.0 / n, dtype=float)
+    else:
+        dist = dist / total
+
+    return {node_ids[i]: float(dist[i]) for i in range(n)}
+
+
+def _ai_objective(room: Room, ai_player_id: str, stationary: Dict[str, float], danger_weight: float) -> float:
+    """Higher is better for AI; penalize the strongest opponent heavily."""
+    my_score = stationary.get(ai_player_id, 0.0)
+    opponent_scores = [stationary.get(p.id, 0.0) for p in room.players if p.id != ai_player_id]
+    if not opponent_scores:
+        return my_score
+    top_opponent = max(opponent_scores)
+    avg_opponent = sum(opponent_scores) / len(opponent_scores)
+    return my_score - danger_weight * top_opponent - 0.10 * avg_opponent
+
+
 def populate_ai_moves(room: Room):
-    """Ensure every AI player has submitted moves for the current turn."""
+    """Ensure every AI player has submitted stronger but slightly randomized moves."""
     if not room.players:
         return
     node_edges = room.graph.setdefault("edges", [])
@@ -229,72 +297,123 @@ def populate_ai_moves(room: Room):
                 player.location = "Waiting"
             continue
 
-        ai_moves_payload = []
-
-        # Split effort between boosting own inbound edges and weakening the top opponent
-        boost_budget = max(1, (budget * 3) // 4)
-        sabotage_budget = budget - boost_budget
-
-        competitor_edge = None
-        competitor: Optional[Player] = None
-        if sabotage_budget > 0:
-            competitor = _select_competitor(room, player.id)
-            if competitor:
-                opponent_edges = _incoming_edges(room, competitor.id, neutral_ids)
-                competitor_edge = _pick_weighted_edge(opponent_edges, prefer_low_weight=False)
-            if competitor_edge is None:
-                boost_budget += sabotage_budget
-                sabotage_budget = 0
-
-        incoming = _incoming_edges(room, player.id, neutral_ids)
-        if not incoming:
-            incoming = _incoming_edges(room, player.id)
-        if not incoming:
+        # Candidate edge pools
+        incoming_self = _incoming_edges(room, player.id, neutral_ids) or _incoming_edges(room, player.id)
+        if not incoming_self:
             fallback_edge = {"source": player.id, "target": player.id, "weight": 0.0}
             node_edges.append(fallback_edge)
-            incoming = [fallback_edge]
+            incoming_self = [fallback_edge]
 
-        boost_edge = _pick_weighted_edge(incoming, prefer_low_weight=True)
-        if boost_edge is None:
-            continue
-
-        boost_source = _node_label(room, boost_edge["source"])
-        boost_target = _node_label(room, boost_edge["target"])
-        boost_note = f"Boosted {boost_source}→{boost_target} by +{boost_budget} to fortify own inflow."
-
-        move_obj = Move(
-            id=next_move_id,
-            player_id=player.id,
-            source=boost_edge["source"],
-            target=boost_edge["target"],
-            weight_change=boost_budget,
-            note=boost_note,
+        opponents = sorted(
+            [p for p in room.players if p.id != player.id],
+            key=lambda p: p.score or 0.0,
+            reverse=True
         )
-        room.moves.append(move_obj)
-        ai_moves_payload.append(move_obj.dict())
-        room.ai_move_notes[player.id].append(boost_note)
-        next_move_id += 1
+        focus_opponents = opponents[:2]
 
-        if sabotage_budget > 0 and competitor_edge is not None:
-            competitor = next((p for p in room.players if p.id == competitor_edge["target"]), None)
-            competitor_name = competitor.name if competitor else _node_label(room, competitor_edge["target"])
-            sab_source = _node_label(room, competitor_edge["source"])
-            sab_target = _node_label(room, competitor_edge["target"])
-            sabotage_note = (
-                f"Weakened {competitor_name}'s inflow {sab_source}→{sab_target} by {sabotage_budget} to slow their score."
-            )
+        boost_edges = {
+            (edge["source"], edge["target"])
+            for edge in incoming_self
+        }
+        sabotage_edges = set()
+        for opponent in focus_opponents:
+            incoming_opp = _incoming_edges(room, opponent.id, neutral_ids) or _incoming_edges(room, opponent.id)
+            sabotage_edges.update((edge["source"], edge["target"]) for edge in incoming_opp)
+
+        # Trailing AIs play more aggressively against leaders.
+        my_now = player.score or 0.0
+        top_opp_now = max((p.score or 0.0) for p in opponents) if opponents else 0.0
+        danger_weight = 1.05 if my_now + 1e-9 < top_opp_now else 0.82
+
+        # Start from current pending board (includes earlier AI decisions this round).
+        working_weights = _effective_edge_weights(room)
+        planned_net_changes: Dict[tuple[str, str], int] = {}
+        spent_points = 0
+        explore_rate = 0.14  # small randomness
+
+        while spent_points < budget:
+            baseline_dist = _stationary_distribution_from_weights(room, working_weights)
+            baseline_obj = _ai_objective(room, player.id, baseline_dist, danger_weight)
+            candidate_actions: List[Dict[str, Any]] = []
+
+            for edge_key in boost_edges:
+                if edge_key not in working_weights:
+                    continue
+                current_w = working_weights[edge_key]
+                working_weights[edge_key] = current_w + 1.0
+                trial_dist = _stationary_distribution_from_weights(room, working_weights)
+                gain = _ai_objective(room, player.id, trial_dist, danger_weight) - baseline_obj
+                # Prefer boosts fed by currently important source nodes.
+                gain += 0.10 * baseline_dist.get(edge_key[0], 0.0)
+                candidate_actions.append({"edge": edge_key, "delta": 1, "gain": gain})
+                working_weights[edge_key] = current_w
+
+            for edge_key in sabotage_edges:
+                if edge_key not in working_weights:
+                    continue
+                current_w = working_weights[edge_key]
+                if current_w <= 0:
+                    continue
+                working_weights[edge_key] = max(0.0, current_w - 1.0)
+                trial_dist = _stationary_distribution_from_weights(room, working_weights)
+                gain = _ai_objective(room, player.id, trial_dist, danger_weight) - baseline_obj
+                # Prefer cutting inflow from high-mass source nodes.
+                gain += 0.08 * baseline_dist.get(edge_key[0], 0.0)
+                candidate_actions.append({"edge": edge_key, "delta": -1, "gain": gain})
+                working_weights[edge_key] = current_w
+
+            if not candidate_actions:
+                break
+
+            candidate_actions.sort(key=lambda item: item["gain"], reverse=True)
+            shortlist = candidate_actions[:min(4, len(candidate_actions))]
+
+            if random.random() < explore_rate and len(shortlist) > 1:
+                floor = shortlist[-1]["gain"]
+                weights = [max(item["gain"] - floor, 0.0) + 0.01 for item in shortlist]
+                chosen = random.choices(shortlist, weights=weights, k=1)[0]
+            else:
+                chosen = shortlist[0]
+
+            edge_key = chosen["edge"]
+            delta = int(chosen["delta"])
+            working_weights[edge_key] = max(0.0, working_weights[edge_key] + delta)
+            planned_net_changes[edge_key] = planned_net_changes.get(edge_key, 0) + delta
+            spent_points += 1
+
+        ai_moves_payload = []
+        for (source, target), net_change in sorted(planned_net_changes.items(), key=lambda kv: abs(kv[1]), reverse=True):
+            if net_change == 0:
+                continue
+            source_label = _node_label(room, source)
+            target_label = _node_label(room, target)
+            if net_change > 0:
+                note = (
+                    f"Reinforced {source_label}→{target_label} by +{net_change} "
+                    f"after impact simulation."
+                )
+            else:
+                rival_name = _node_label(room, target)
+                note = (
+                    f"Disrupted {rival_name}'s inflow {source_label}→{target_label} "
+                    f"by {abs(net_change)} after impact simulation."
+                )
+
             move_obj = Move(
                 id=next_move_id,
                 player_id=player.id,
-                source=competitor_edge["source"],
-                target=competitor_edge["target"],
-                weight_change=-sabotage_budget,
-                note=sabotage_note,
+                source=source,
+                target=target,
+                weight_change=net_change,
+                note=note,
             )
             room.moves.append(move_obj)
             ai_moves_payload.append(move_obj.dict())
-            room.ai_move_notes[player.id].append(sabotage_note)
+            room.ai_move_notes[player.id].append(note)
             next_move_id += 1
+
+        if not ai_moves_payload:
+            room.ai_move_notes[player.id].append("Held position after evaluating low-impact alternatives.")
 
         room.submitted_moves_points[player.id] = room.points_per_round_K
         player.location = "Waiting"
@@ -342,12 +461,11 @@ async def _calculate_scores_and_advance_turn(room_id: str):
 
     for edge in room.graph["edges"]:
         u, v = node_index[edge["source"]], node_index[edge["target"]]
-        # Adjacency matrix構築時に、重みが0の場合は0.01に置き換える
         weight = max(0.01, float(edge["weight"]))
         adj_matrix[u, v] = weight
     print("Adjacency Matrix:\n", adj_matrix)
     # Assign adjacency matrix to the current turn
-    room.turns[str(room.turn)].adj_matrix = np.where(adj_matrix == 0.1, 0, adj_matrix).tolist()
+    room.turns[str(room.turn)].adj_matrix = np.where(adj_matrix < 0.011, 0, adj_matrix).tolist()
     room.turns[str(room.turn)].completed = True
 
     # Compute out/in degrees from adjacency matrix

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ReturnButton from '../components/ReturnButton.jsx';
+import { getPreviousRoundAiNotes } from "../utils/aiInsights.js";
 
 export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDeleteRoom, onRenamePlayer, onGameOver }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const selectedPlayer = room.players.find(p => p.id === selectedPlayerId);
   const canStart = Boolean(selectedPlayerId && !selectedPlayer?.is_ai);
-  const aiNotesMap = room.ai_move_notes || {};
+  const { notesByPlayer: aiNotesMap } = getPreviousRoundAiNotes(room);
 
   // if game already finished, navigate immediately to Trophy
   useEffect(() => {

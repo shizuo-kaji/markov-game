@@ -2,13 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import DiredEdge from "./DiredEdge";
 
 export default function BoardPlayerEdges({ room, playMode }) {
-  if (!room || !room.nodes) {
-    console.log('BoardPlayerEdges: room or room.nodes is undefined, returning null.');
-    return null;
-  }
-  console.log('BoardPlayerEdges: room', room);
-  const nodes = room.nodes || [];
-  const getNode = (id) => nodes.find((n) => n.id === id);
+  const nodes = useMemo(() => room?.nodes ?? [], [room?.nodes]);
   const endorseColor  = "hsla(110, 70%, 50%, 1.00)";
   const sabotageColor = "hsla(0, 70%, 60%, 1.00)";
   const bgModeColor   = playMode === "endorse" ? endorseColor : sabotageColor;
@@ -21,33 +15,38 @@ export default function BoardPlayerEdges({ room, playMode }) {
       const rect = containerRef.current.getBoundingClientRect();
       setDims({ width: rect.width, height: rect.height });
     }
-  }, []);
+  }, [nodes.length]);
 
   // Compute pixel coords from percentage values
   const toPx = (coord, size) =>
     typeof coord === 'string' && coord.endsWith('%')
       ? (parseFloat(coord) / 100) * size
       : Number(coord);
-  const turnIndex = room.turn - 1;
-  console.log('BoardPlayerEdges: turnIndex', turnIndex);
-  const edges = nodes.flatMap((fromNode, fromIdx) =>
-    nodes
-      .map((toNode, toIdx) => {
-        const weight = room.turns?.[turnIndex]?.adj_matrix?.[fromIdx]?.[toIdx] ?? 0;
-        return {
-          x1: toPx(fromNode.x, dims.width),
-          y1: toPx(fromNode.y, dims.height),
-          x2: toPx(toNode.x, dims.width),
-          y2: toPx(toNode.y, dims.height),
-          weight: weight,
-        };
-      })
-      .filter(edge => edge.weight > 0.9)
+  const turnIndex = (room?.turn ?? 1) - 1;
+  const edges = useMemo(
+    () =>
+      nodes.flatMap((fromNode, fromIdx) =>
+        nodes
+          .map((toNode, toIdx) => {
+            const weight = room?.turns?.[turnIndex]?.adj_matrix?.[fromIdx]?.[toIdx] ?? 0;
+            return {
+              x1: toPx(fromNode.x, dims.width),
+              y1: toPx(fromNode.y, dims.height),
+              x2: toPx(toNode.x, dims.width),
+              y2: toPx(toNode.y, dims.height),
+              weight,
+            };
+          })
+          .filter((edge) => edge.weight > 0.9)
+      ),
+    [nodes, dims.width, dims.height, room?.turns, turnIndex]
   );
   // Compute node labels from adjacency adjMatrix for current turn
   const nodeLabels = useMemo(() => {
     return nodes.map(() => ""); // Simply return empty strings for now
   }, [nodes]);
+
+  if (!room || !nodes.length) return null;
 
   return (
     <div ref={containerRef} className="absolute w-full h-full pointer-events-none">

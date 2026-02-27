@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
+import NodeIcon from "../components/NodeIcon.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
 
 function Spectator({ room, onGameOver, onReturn }) {
@@ -169,8 +170,6 @@ function Spectator({ room, onGameOver, onReturn }) {
     return node?.name || `Node ${nodeId}`;
   };
 
-  const isGameOver = currentRoom.turn > currentRoom.max_turns_S;
-
   return (
     <div className="appBackground">
       <header className="bg-stone-100/80">
@@ -189,8 +188,7 @@ function Spectator({ room, onGameOver, onReturn }) {
                   inline-flex items-center
                   bg-stone-100/90 rounded-lg border-2 border-black
                   px-1 py-1 gap-1 mr-1 grid grid-flow-col auto-cols-max">
-                <img src={`/assets/nodes/${p.icon}`}
-                  alt={p.name} className="w-6 h-6" />
+                <NodeIcon icon={p.icon} alt={p.name} className="w-6 h-6" />
                 {p.is_ai && <span className="text-xs" title={noteText}>🤖</span>}
                 <span className="leading-none">
                   {Math.round((p.score ?? 0) * 100)}%
@@ -226,7 +224,7 @@ function Spectator({ room, onGameOver, onReturn }) {
                   className={`rounded p-2 ${isReady ? 'bg-emerald-900/50 border border-emerald-500' : 'bg-stone-700/50 border border-stone-500'}`}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <img src={`/assets/nodes/${p.icon}`} alt={p.name} className="w-5 h-5" />
+                    <NodeIcon icon={p.icon} alt={p.name} className="w-5 h-5" />
                     <span className="text-white font-semibold">{p.name}</span>
                     {p.is_ai && <span className="text-xs text-amber-300">🤖</span>}
                     <span className={`ml-auto text-xs ${isReady ? 'text-emerald-300' : 'text-amber-300'}`}>

@@ -4,29 +4,30 @@
 @layer base {
   html, body {
     height: 100%;
+    margin: 0;
     @apply bg-black;
   }
   #root {
-    /* never exceed 800px; shrink with viewport; center */
-    @apply w-full max-w-[800px] mx-auto px-4 box-border;
+    /* constrain width while keeping room for narrow/mobile layouts */
+    @apply w-full max-w-[800px] min-h-[100dvh] mx-auto px-2 sm:px-4 box-border;
   }
 }
 
 .appBackground {
-  @apply relative flex flex-col h-screen;
+  @apply relative flex h-[100dvh] min-h-0 flex-col overflow-hidden;
   @apply bg-white/90 bg-blend-overlay bg-cover bg-center;
   background-image: url('/assets/background/bg2.png');
 }
 
 .appWelcome {
-  @apply relative flex h-screen;
+  @apply relative flex min-h-[100dvh] w-full overflow-hidden justify-center;
   @apply bg-orange-900 bg-contain;
   @apply text-amber-100 font-mono;
   background-image: url('/assets/background/bg4.png');
 }
 
 .sidePanel {
-  @apply w-110 p-4 flex bg-orange-900/90 flex-col space-y-4;
+  @apply w-full max-w-[28rem] h-[100dvh] overflow-y-auto p-3 sm:p-4 flex bg-orange-900/90 flex-col space-y-3 sm:space-y-4;
 }
 
 /* hide Chrome/Edge spinners */

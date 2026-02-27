@@ -3,15 +3,17 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useCallback,
   useImperativeHandle,
   forwardRef
 } from "react";
 import DiredEdge from "./DiredEdge";
 import BoardPlayerEdges from "./BoardPlayerEdges.jsx";
+import NodeIcon from "./NodeIcon.jsx";
 
 
 const Board = forwardRef(function Board({
-  as: Component = "div",
+  as: RootComponent = "div",
   className = "",
   nodes: initialNodes,
   bgModeColor = "gray",
@@ -38,11 +40,11 @@ const Board = forwardRef(function Board({
     }
   }, [initialNodes]);
 
-  const handleMouseDown = (e, id) => {
+  const handleMouseDown = (_e, id) => {
     setDraggingNode(id);
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (draggingNode === null) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
@@ -59,11 +61,11 @@ const Board = forwardRef(function Board({
       return n;
     });
     setNodes(newNodes);
-  };
+  }, [draggingNode, nodes]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setDraggingNode(null);
-  };
+  }, []);
 
   useEffect(() => {
     window.addEventListener("mousemove", handleMouseMove);
@@ -73,14 +75,14 @@ const Board = forwardRef(function Board({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [draggingNode, nodes]);
+  }, [handleMouseMove, handleMouseUp]);
 
 
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
   const [arrow, setArrow] = useState(null); // provisional single arrow only
 
-  const [showBoardPlayerEdges, setShowBoardPlayerEdges] = useState(true);
+  const showBoardPlayerEdges = true;
 
 
   // Handle node selection
@@ -94,7 +96,6 @@ const Board = forwardRef(function Board({
   // Compute provisional arrow when both selected
   useEffect(() => {
     if (from && to && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
       const getCenter = (nid) => {
         const node = nodes.find(n => n.id === nid);
         if (!node) return null;
@@ -118,7 +119,7 @@ const Board = forwardRef(function Board({
     }
     // notify parent of new selection
     onSelectionChange?.({ from, to });
-  }, [from, to, nodes]);
+  }, [from, to, nodes, onSelectionChange]);
 
   // Respond to external reset signal
   useEffect(() => {
@@ -143,12 +144,8 @@ const Board = forwardRef(function Board({
 
   const isSelected = (id) => id === from || id === to;
 
-  return (
-    <Component
-      ref={containerRef}
-      className={`bg-[url('/assets/background/bg3.png')] bg-white/10 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`}
-      {...restProps}
-    >
+  const children = (
+    <>
       {nodes.map((n) => (
         <button
           key={n.id}
@@ -174,8 +171,8 @@ const Board = forwardRef(function Board({
                 <span>入{n.in_deg?? -1} </span>
               </div>
            */}
-            <img
-              src={`/assets/nodes/${n.icon}`}
+            <NodeIcon
+              icon={n.icon}
               alt={n.name}
               className="w-11 h-11"
               style={{ pointerEvents: 'none' }}
@@ -196,8 +193,17 @@ const Board = forwardRef(function Board({
           )}
           <DiredEdge coords={arrow} offset={50} color={playMode} strokeWidth={4} />
         </div>
+    </>
+  );
 
-      </Component>
+  return React.createElement(
+    RootComponent,
+    {
+      ref: containerRef,
+      className: `bg-[url('/assets/background/bg3.png')] bg-white/10 bg-blend-overlay bg-center bg-[length:450px_auto] ${className}`,
+      ...restProps
+    },
+    children
   );
 });
 

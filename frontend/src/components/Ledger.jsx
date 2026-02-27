@@ -7,11 +7,12 @@ export default function Ledger({ ledger, getNode }) {
   return (
     <ul className="
       absolute left-1/2 -translate-x-1/2 top-1
-      md:top-2 bg-white/80 backdrop-blur-sm 
-      px-2 py-1 rounded 
-      text-[9px] 
+      md:top-2 bg-white/80 backdrop-blur-sm
+      w-[calc(100%-0.75rem)] max-w-md max-h-full overflow-y-auto
+      px-2 py-1 rounded
+      text-[9px] break-words
       space-y-1 
-      shadow pointer-events-none">
+      shadow">
       {ledger.map((m, i) => {
         const a = getNode(m.from);
         const b = getNode(m.to);
