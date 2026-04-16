@@ -18,12 +18,12 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
       {/* Left panel */}
       <aside className="sidePanel">
         <h1 className="
-          text-5xl 
-          p-2 
-          font-bold font-serif 
+          text-xl
+          p-2
+          font-bold font-serif
           drop-shadow"
-        > Markovian<br />Town </h1>
-        <img src={"/assets/background/game_clean.png"} alt="logo" className="w-80 h-80" />
+        > Markovian Town </h1>
+        <img src={"/assets/background/game_clean.png"} alt="logo" className="w-50 h-50" />
 
         {/* Server status indicator */}
         <div className={`flex items-center gap-2 p-2 rounded ${status.color}`}>
@@ -79,8 +79,8 @@ export default function Welcome({ rooms, onEnterRoom, onDeleteRoom, onCreateRoom
         )}
         <button
           className={`relative h-12 bottom-2 rounded p-2 font-bold active:translate-y-0.5 ${serverStatus === "online"
-              ? "bg-amber-300 text-orange-900 hover:bg-amber-400"
-              : "bg-stone-500 text-stone-300 cursor-not-allowed"
+            ? "bg-amber-300 text-orange-900 hover:bg-amber-400"
+            : "bg-stone-500 text-stone-300 cursor-not-allowed"
             }`}
           onClick={onCreateRoom}
           disabled={serverStatus !== "online"}

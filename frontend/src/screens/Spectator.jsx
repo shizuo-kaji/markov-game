@@ -1,18 +1,47 @@
 // Spectator.jsx - Observer mode with full visibility of game state
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
 import NodeIcon from "../components/NodeIcon.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
+import { CONVERGENCE_DEMO_TOTAL_DURATION_MS } from "../utils/markov.js";
+
+const createDemoState = (roomData) => ({
+  active: true,
+  turnKey: Math.max(1, (roomData?.turn ?? 1) - 1),
+  demoId: `${roomData?.id ?? "room"}-${roomData?.turn ?? 1}-${Date.now()}`,
+});
 
 function Spectator({ room, onGameOver, onReturn }) {
   const apiBase = useApi();
   const [currentRoom, setCurrentRoom] = useState(room);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [turnCompleted, setTurnCompleted] = useState(false);
+  const [convergenceDemo, setConvergenceDemo] = useState({ active: false, turnKey: null, demoId: null });
   const lastTurnRef = useRef(room.turn);
   const isAdvancingRef = useRef(false);
   const hasNavigatedRef = useRef(false);
+  const demoTimeoutRef = useRef(null);
+  const finalNavigationTimeoutRef = useRef(null);
+
+  const startConvergenceDemo = useCallback((roomData) => {
+    if (demoTimeoutRef.current) {
+      window.clearTimeout(demoTimeoutRef.current);
+    }
+    setConvergenceDemo(createDemoState(roomData));
+    demoTimeoutRef.current = window.setTimeout(() => {
+      setConvergenceDemo({ active: false, turnKey: null, demoId: null });
+    }, CONVERGENCE_DEMO_TOTAL_DURATION_MS);
+  }, []);
+
+  useEffect(() => () => {
+    if (demoTimeoutRef.current) {
+      window.clearTimeout(demoTimeoutRef.current);
+    }
+    if (finalNavigationTimeoutRef.current) {
+      window.clearTimeout(finalNavigationTimeoutRef.current);
+    }
+  }, []);
 
   // Store latest room data in ref to avoid dependency issues
   const currentRoomRef = useRef(currentRoom);
@@ -30,10 +59,15 @@ function Spectator({ room, onGameOver, onReturn }) {
           const data = await res.json();
           // Check if game is over first
           if (data.turn > data.max_turns_S) {
-            console.log('Spectator: game over detected', data.turn, '>', data.max_turns_S);
             hasNavigatedRef.current = true;
             setCurrentRoom(data);
-            onGameOver();
+            startConvergenceDemo(data);
+            if (finalNavigationTimeoutRef.current) {
+              window.clearTimeout(finalNavigationTimeoutRef.current);
+            }
+            finalNavigationTimeoutRef.current = window.setTimeout(() => {
+              onGameOver();
+            }, CONVERGENCE_DEMO_TOTAL_DURATION_MS);
             return;
           }
           // Detect turn change - reset flags
@@ -41,6 +75,7 @@ function Spectator({ room, onGameOver, onReturn }) {
             lastTurnRef.current = data.turn;
             setTurnCompleted(false);
             isAdvancingRef.current = false;
+            startConvergenceDemo(data);
           }
           setCurrentRoom(data);
         }
@@ -86,7 +121,7 @@ function Spectator({ room, onGameOver, onReturn }) {
       fetchTurnCompleted();
     }, 500);
     return () => clearInterval(interval);
-  }, [apiBase, room.id, onGameOver]);
+  }, [apiBase, room.id, onGameOver, startConvergenceDemo]);
 
   // Auto-advance turn when ready (spectator can trigger this for AI-only games)
   useEffect(() => {
@@ -104,31 +139,6 @@ function Spectator({ room, onGameOver, onReturn }) {
       }
     })();
   }, [readyToAdvance, turnCompleted, apiBase, room.id]);
-
-  // Navigate after turn completed (similar to Waiting.jsx)
-  useEffect(() => {
-    if (!turnCompleted) return;
-    if (hasNavigatedRef.current) return;
-    (async () => {
-      try {
-        const res = await fetch(`${apiBase}/rooms/${room.id}`);
-        if (res.ok) {
-          const updatedRoom = await res.json();
-          setCurrentRoom(updatedRoom);
-          console.log('Spectator: turn completed, checking game over', updatedRoom.turn, '>', updatedRoom.max_turns_S);
-          if (updatedRoom.turn > updatedRoom.max_turns_S) {
-            hasNavigatedRef.current = true;
-            onGameOver();
-          } else {
-            // Reset for next turn
-            isAdvancingRef.current = false;
-          }
-        }
-      } catch (e) {
-        console.error('Error refreshing room after turn:', e);
-      }
-    })();
-  }, [turnCompleted, apiBase, room.id, onGameOver]);
 
   // Derive nodes for Board
   const nodes = [
@@ -206,11 +216,17 @@ function Spectator({ room, onGameOver, onReturn }) {
           nodes={nodes}
           currentRoom={currentRoom}
           playMode="spectator"
+          convergenceDemo={convergenceDemo}
         />
 
         {/* Detailed moves panel for spectators */}
         <section className="flex-[4] bg-stone-800/90 overflow-y-auto p-3">
           <h2 className="text-white font-bold mb-2">Submitted Moves (This Round)</h2>
+          {convergenceDemo.active && (
+            <p className="mb-3 rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-sm text-stone-200">
+              Watching the crowd redistribute along the new transition weights before the next round begins.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {currentRoom.players.map(p => {
               const playerMoves = movesByPlayer[p.id] || [];

@@ -36,11 +36,11 @@ export default function NewRoom({ onCreate, onReturn }) {
     >
       <aside className="sidePanel">
         <h1 className="
-        text-5xl 
-        p-2 
-        font-bold font-serif 
+        text-2xl
+        p-2
+        font-bold font-serif
         drop-shadow"
-        > Markovian<br />Town </h1>
+        > Markovian Town </h1>
         <CreateRoom onCreate={handleCreate} loading={loading} />
       </aside>
       <ReturnButton onClick={onReturn} />

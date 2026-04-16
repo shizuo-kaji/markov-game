@@ -1,53 +1,7 @@
 import { useState, useMemo } from "react";
 import Board from "../components/Board.jsx";
 import NodeIcon from "../components/NodeIcon.jsx";
-
-function computeStationaryScores(adjMatrix, nodeIds) {
-  if (!adjMatrix || adjMatrix.length === 0 || !nodeIds || nodeIds.length !== adjMatrix.length) {
-    return null;
-  }
-
-  const n = adjMatrix.length;
-  const transition = Array.from({ length: n }, () => Array(n).fill(0));
-
-  // Match backend behavior: each existing weight has a tiny positive floor.
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      transition[i][j] = Math.max(0.01, Number(adjMatrix[i][j] ?? 0));
-    }
-  }
-
-  for (let i = 0; i < n; i++) {
-    const rowSum = transition[i].reduce((acc, value) => acc + value, 0) || 1;
-    for (let j = 0; j < n; j++) {
-      transition[i][j] /= rowSum;
-    }
-  }
-
-  // Power iteration for the stationary distribution
-  let dist = Array(n).fill(1 / n);
-  for (let iter = 0; iter < 400; iter++) {
-    const next = Array(n).fill(0);
-    for (let j = 0; j < n; j++) {
-      let value = 0;
-      for (let i = 0; i < n; i++) {
-        value += dist[i] * transition[i][j];
-      }
-      next[j] = value;
-    }
-    const diff = next.reduce((acc, value, idx) => acc + Math.abs(value - dist[idx]), 0);
-    dist = next;
-    if (diff < 1e-11) break;
-  }
-
-  const total = dist.reduce((acc, value) => acc + value, 0) || 1;
-  const normalized = dist.map((value) => value / total);
-
-  return nodeIds.reduce((acc, nodeId, idx) => {
-    acc[nodeId] = normalized[idx];
-    return acc;
-  }, {});
-}
+import { computeStationaryScores } from "../utils/markov.js";
 
 
 export default function Trophy({ onRestart, room }) {
@@ -147,7 +101,7 @@ export default function Trophy({ onRestart, room }) {
           className="relative flex-[6] border-t-2 border-b-2"
           nodes={roomAtTurn.nodes}
           currentRoom={roomAtTurn}
-          playMode={showReview ? "review" : undefined}
+          playMode={showReview ? "review" : "results"}
         />
 
         {showReview ? (

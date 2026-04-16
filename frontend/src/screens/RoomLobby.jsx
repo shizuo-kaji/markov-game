@@ -20,11 +20,11 @@ export default function RoomLobby({ room, onStart, onSpectate, onReturn, onDelet
       {/* Left panel */}
       <aside className="sidePanel">
         <h1 className="
-          text-5xl 
-          p-2 
-          font-bold font-serif 
+          text-2xl
+          p-2
+          font-bold font-serif
           drop-shadow"
-        > Markovian<br />Town </h1>
+        > Markovian Town </h1>
         {/* Room title card */}
         <div className="flex items-center h-12 justify-between bg-emerald-600/20 rounded p-2 hover:bg-emerald-600 mb-2">
           <span className="flex-1 ml-2 text-white font-bold text-lg">{room.name}</span>

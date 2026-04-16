@@ -1,14 +1,22 @@
 // Waiting.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useApi } from '../../apiConfig.js';
 import Board from "../components/Board.jsx";
 import AiInsightsPanel from "../components/AiInsightsPanel.jsx";
 import NodeIcon from "../components/NodeIcon.jsx";
 import ReturnButton from '../components/ReturnButton.jsx';
 import { getPreviousRoundAiNotes } from "../utils/aiInsights.js";
+import { CONVERGENCE_DEMO_TOTAL_DURATION_MS } from "../utils/markov.js";
+
+const createDemoState = (roomData) => ({
+  active: true,
+  turnKey: Math.max(1, (roomData?.turn ?? 1) - 1),
+  demoId: `${roomData?.id ?? "room"}-${roomData?.turn ?? 1}-${Date.now()}`,
+});
 
 function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turnNumber }) {
   const apiBase = useApi();
+  const navigationTimeoutRef = useRef(null);
   // Inform server of current screen location
   useEffect(() => {
     (async () => {
@@ -28,7 +36,21 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
   const [currentRoom, setCurrentRoom] = useState(room);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [turnCompleted, setTurnCompleted] = useState(false);
+  const [convergenceDemo, setConvergenceDemo] = useState({ active: false, turnKey: null, demoId: null });
+
+  const stopConvergenceDemo = useCallback(() => {
+    setConvergenceDemo((current) => (current.active ? { active: false, turnKey: null, demoId: null } : current));
+  }, []);
+
+  useEffect(() => () => {
+    if (navigationTimeoutRef.current) {
+      window.clearTimeout(navigationTimeoutRef.current);
+    }
+  }, []);
+
   useEffect(() => {
+    if (turnCompleted) return undefined;
+
     const fetchRoom = async () => {
       try {
         const res = await fetch(`${apiBase}/rooms/${room.id}`);
@@ -67,7 +89,7 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
     };
     const interval = setInterval(() => { fetchRoom(); fetchReady(); fetchTurnCompleted(); }, 500);
     return () => clearInterval(interval);
-  }, [apiBase, room.id, turnNumber, currentRoom.turns]);
+  }, [apiBase, room.id, turnCompleted, turnNumber, currentRoom.turns]);
 
   // derive dynamic nodes from backend (players and neutrals) for map layout
   const nodes = [
@@ -124,16 +146,24 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         if (res.ok) {
           updatedRoom = await res.json();
           setCurrentRoom(updatedRoom);
+          setConvergenceDemo(createDemoState(updatedRoom));
         }
       } catch (e) {
         console.error('Error refreshing room before navigation:', e);
       }
-      // then schedule navigation
-      console.log('Navigating now to', updatedRoom.turn > updatedRoom.max_turns_S ? 'GameOver' : 'NextTurn');
-      if (updatedRoom.turn > updatedRoom.max_turns_S) onGameOver();
-      else onNextTurn();
+      if (!updatedRoom) return;
+
+      if (navigationTimeoutRef.current) {
+        window.clearTimeout(navigationTimeoutRef.current);
+      }
+      navigationTimeoutRef.current = window.setTimeout(() => {
+        stopConvergenceDemo();
+        console.log('Navigating now to', updatedRoom.turn > updatedRoom.max_turns_S ? 'GameOver' : 'NextTurn');
+        if (updatedRoom.turn > updatedRoom.max_turns_S) onGameOver();
+        else onNextTurn();
+      }, CONVERGENCE_DEMO_TOTAL_DURATION_MS);
     })();
-  }, [turnCompleted, apiBase, room.id, onGameOver, onNextTurn]);
+  }, [turnCompleted, apiBase, room.id, onGameOver, onNextTurn, stopConvergenceDemo]);
 
   /* --- render ---------------------------------------------------------- */
   return (
@@ -176,6 +206,7 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
           nodes={nodes}
           currentRoom={currentRoom}
           playMode="wait"
+          convergenceDemo={convergenceDemo}
         />
         <section className="relative min-h-[52px] flex-[2] overflow-y-auto bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow text-[9px]">
           <ul className="list-none grid grid-cols-2 gap-x-4 gap-y-1">
@@ -205,14 +236,21 @@ function Waiting({ room, currentPlayerId, onNextTurn, onGameOver, onReturn, turn
         <div className="flex items-center justify-center">
         {turnCompleted ? (
             <h2 className="font-bold">
-              {isLastTurn
-                ? 'Final score coming...'
-                : 'Next turn starting...'}
+              {convergenceDemo.active
+                ? 'Watching the new Markov flow settle...'
+                : isLastTurn
+                  ? 'Final score coming...'
+                  : 'Next turn starting...'}
             </h2>
           ) : (
             <h2 className="font-bold">Waiting for other players</h2>
           )}
         </div>
+        {convergenceDemo.active && (
+          <p className="mt-2 max-w-xs text-center text-sm text-stone-700">
+            Dots begin evenly spread, then follow the updated edge weights toward the steady state.
+          </p>
+        )}
       </footer>
       <ReturnButton onClick={onReturn} />
     </div>
