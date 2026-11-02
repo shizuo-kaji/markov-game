@@ -1,6 +1,5 @@
-fastapi
-uvicorn[standard]
-numpy
-scipy
-python-json-logger
-networkx
+fastapi>=0.115,<1
+pydantic>=2.9,<3
+uvicorn[standard]>=0.30,<1
+numpy>=1.26,<3
+python-json-logger>=2,<5

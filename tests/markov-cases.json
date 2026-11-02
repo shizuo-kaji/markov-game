@@ -1,0 +1,8 @@
+[
+  {"name":"symmetric teaching board","weights":[[0,1,2,2],[1,0,2,2],[2,2,0,1],[2,2,1,0]],"alpha":1},
+  {"name":"attract visitors","weights":[[0,1,2,2],[1,0,2,2],[5,2,0,1],[2,2,1,0]],"alpha":1},
+  {"name":"near periodic","weights":[[0,1000000],[1,0]],"alpha":1},
+  {"name":"zero graph","weights":[[0,0,0],[0,0,0],[0,0,0]],"alpha":1},
+  {"name":"trap with teleportation","weights":[[8,0,0,0],[1,0,2,2],[2,2,0,1],[2,2,1,0]],"alpha":0.85},
+  {"name":"pure teleportation","weights":[[20,0],[1,0]],"alpha":0}
+]

@@ -1,277 +1,267 @@
-// GameApp.jsx
-import { useState, useCallback, useEffect } from "react";
-import { useApi } from '../apiConfig.js';  // import API helper
-
-import Welcome from "./screens/Welcome.jsx";
-import Player from "./screens/Player.jsx";
-import Waiting from "./screens/Waiting.jsx";
-import Trophy from "./screens/Trophy.jsx";
-import NewRoom from "./screens/NewRoom.jsx";
-import RoomLobby from "./screens/RoomLobby.jsx";
-import Spectator from "./screens/Spectator.jsx";
-
+import { useI18n } from "./i18n/useI18n.js";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import Home from "./screens/Home.jsx";
+import Icon from "./components/Icon.jsx";
+import { api, writeStorage } from "./utils/api.js";
+import { PRESETS, presetPayload } from "./utils/presets.js";
+const RoomForm = lazy(() => import("./components/RoomForm.jsx"));
+const Laboratory = lazy(() => import("./screens/Laboratory.jsx"));
+const Guide = lazy(() => import("./screens/Guide.jsx"));
+const GameRoom = lazy(() => import("./screens/GameRoom.jsx"));
+const currentRoute = () => window.location.hash.slice(1) || "home";
 export default function GameApp() {
-  const apiBase = useApi();
-  const [screen, setScreen] = useState("welcome");
-  const [rooms, setRooms] = useState([]);  // list of available rooms
-  const [lastTurnNumber, setLastTurnNumber] = useState(null);
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [serverStatus, setServerStatus] = useState("connecting"); // "connecting" | "online" | "offline"
-
-  // Wake up backend on app startup (useful for cold-start servers)
-  // Also pre-create a warmup room to speed up first room creation
-  useEffect(() => {
-    let isMounted = true;
-    const checkServer = async () => {
-      try {
-        const res = await fetch(`${apiBase}/rooms`);
-        if (isMounted) {
-          if (res.ok) {
-            setServerStatus("online");
-            // Create a warmup room in the background to pre-warm room creation
-            fetch(`${apiBase}/rooms`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: "__warmup__",
-                num_players_N: 2,
-                num_non_player_nodes_M: 0,
-                points_per_round_K: 5,
-                max_turns_S: 2,
-              }),
-            }).catch(() => {}); // Ignore errors, this is just a warmup
-          } else {
-            setServerStatus("offline");
-          }
-        }
-      } catch {
-        if (isMounted) setServerStatus("offline");
+  const { t, language, setLanguage } = useI18n();
+  const [route, setRoute] = useState(currentRoute);
+  const [rooms, setRooms] = useState([]);
+  const [status, setStatus] = useState("connecting");
+  const [preset, setPreset] = useState("solo");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const warmed = useRef(false);
+  const fetching = useRef(false);
+  const creating = useRef(false);
+  const main = useRef(null);
+  const refresh = useCallback(async () => {
+    if (fetching.current) return;
+    fetching.current = true;
+    setStatus((previous) => (previous === "online" ? "online" : "connecting"));
+    try {
+      const data = await api("/rooms");
+      setRooms(data);
+      setStatus("online");
+      if (!warmed.current) {
+        warmed.current = true;
+        api("/rooms", {
+          body: {
+            name: "__warmup__",
+          },
+        }).catch(() => {
+          warmed.current = false;
+        });
       }
-    };
-    checkServer();
-    return () => { isMounted = false; };
-  }, [apiBase]);
-
-  // Fetch rooms when on welcome screen (filter out warmup rooms)
-  const fetchRooms = useCallback(async () => {
-    try {
-      const res = await fetch(`${apiBase}/rooms`);
-      if (!res.ok) throw new Error(`Error fetching rooms: ${res.status}`);
-      const data = await res.json();
-      // Filter out hidden warmup rooms
-      setRooms(data.filter(r => r.name !== "__warmup__"));
-    } catch (err) {
-      console.error("Error fetching rooms:", err);
-    }
-  }, [apiBase]);
-
-  useEffect(() => {
-    if (screen === "welcome") fetchRooms();
-  }, [screen, fetchRooms]);
-  
-  // Delete a room and refresh list
-  const handleDeleteRoom = useCallback(async (roomId) => {
-    if (!window.confirm('Delete this room?')) return;
-    try {
-      const res = await fetch(`${apiBase}/rooms/${roomId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`Error deleting room: ${res.status}`);
-      fetchRooms();
-    } catch (err) {
-      console.error('Error deleting room:', err);
-    }
-  }, [apiBase, fetchRooms]);
-
-  // Fetch room details when entering a room
-  const handleEnterRoom = useCallback(async (room) => {
-    try {
-      const response = await fetch(`${apiBase}/rooms/${room.id}`);
-      if (!response.ok) throw new Error(`Error fetching room ${room.id}: ${response.status}`);
-      const data = await response.json();
-      // Ensure graph structure
-      if (!data.graph) data.graph = { nodes: [], edges: [] };
-      if (!Array.isArray(data.graph.nodes)) data.graph.nodes = [];
-      if (!Array.isArray(data.graph.edges)) data.graph.edges = [];
-      // build nodes list from backend-provided players and neutrals
-      const nodes = [
-        ...data.players.map(p => ({
-          id: p.id,
-          name: p.name,
-          icon: p.icon,
-          x: p.x_str,
-          y: p.y_str,
-          score: p.score,
-          out_deg: p.out_deg,
-          in_deg: p.in_deg
-        })),
-        ...data.neutrals.map(n => ({
-          id: n.id,
-          name: n.name,
-          icon: n.icon,
-          x: n.x_str,
-          y: n.y_str,
-          score: n.score,
-          out_deg: n.out_deg,
-          in_deg: n.in_deg
-        }))
-      ];
-      setSelectedRoom({ ...data, mode: { player_id: null }, nodes });
-      setScreen("lobby");
-    } catch (err) {
-      console.error(err);
-      // fallback to welcome
-      setScreen("welcome");
-    }
-  }, [apiBase]);
-
-  // After selecting player in lobby, go to player screen
-  const handleSelectPlayer = useCallback((playerId) => {
-    const target = selectedRoom?.players?.find((p) => p.id === playerId);
-    if (target?.is_ai) {
-      window.alert('AI players are controlled by the computer. Please pick a human player.');
-      return;
-    }
-    setSelectedRoom(prev => ({ ...prev, mode: { player_id: playerId, spectator: false } }));
-    setScreen("player");
-  }, [selectedRoom]);
-
-  // Join as spectator
-  const handleSpectate = useCallback(() => {
-    setSelectedRoom(prev => ({ ...prev, mode: { player_id: null, spectator: true } }));
-    setScreen("spectator");
-  }, []);
-
-  // After fetching room details when entering a room, we set selectedRoom and screen
-  // Add a handler for renaming players
-  const handleRenamePlayer = useCallback(async (playerId, newName) => {
-    try {
-      const url = `${apiBase}/rooms/${selectedRoom.id}/players/${playerId}/rename`;
-      console.log('Calling rename endpoint with', { url, playerId, newName });
-      const res = await fetch(
-        url,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ new_name: newName }),
-        }
-      );
-      if (!res.ok) {
-        throw new Error(`Failed to rename player: ${res.status}`);
-      }
-      // Update local selectedRoom.players
-      setSelectedRoom((prev) => {
-        // update players array
-        const updatedPlayers = prev.players.map((p) =>
-          p.id === playerId ? { ...p, name: newName } : p
-        );
-        // update corresponding node names for player nodes
-        const updatedNodes = prev.nodes.map((n) =>
-          n.id === playerId ? { ...n, name: newName } : n
-        );
-        return { ...prev, players: updatedPlayers, nodes: updatedNodes };
-      });
-    } catch (err) {
-      console.error('Error renaming player:', err);
-      alert('Error renaming player: ' + err.message);
-    }
-  }, [apiBase, selectedRoom]);
-
-  // Common: fetch updated room data and transition to given screen
-  const transitionRoom = useCallback(async (targetScreen) => {
-    try {
-      const res = await fetch(`${apiBase}/rooms/${selectedRoom.id}`);
-      if (!res.ok) throw new Error(`Error fetching room: ${res.status}`);
-      const data = await res.json();
-      // rebuild nodes from updated room data
-      const nodes = [
-        ...data.players.map(p => ({
-          id: p.id, name: p.name, icon: p.icon, x: p.x_str, y: p.y_str, score: p.score,
-          out_deg: p.out_deg, in_deg: p.in_deg
-        })),
-        ...data.neutrals.map(n => ({
-          id: n.id, name: n.name, icon: n.icon, x: n.x_str, y: n.y_str, score: n.score,
-          out_deg: n.out_deg, in_deg: n.in_deg
-        }))
-      ];
-      setSelectedRoom({ ...data, mode: selectedRoom.mode, nodes });
-    } catch (err) {
-      console.error(`Error fetching room for ${targetScreen}:`, err);
+    } catch {
+      setStatus("offline");
     } finally {
-      setScreen(targetScreen);
+      fetching.current = false;
     }
-  }, [apiBase, selectedRoom]);
-
-  // After waiting for next turn or game over, fetch new data and navigate
-  const handleNextTurn = useCallback(() => transitionRoom("player"), [transitionRoom]);
-  const handleGameOver = useCallback(() => transitionRoom("trophy"), [transitionRoom]);
-
+  }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+  useEffect(() => {
+    const onChange = () => {
+      setRoute(currentRoute());
+      setError("");
+      window.scrollTo({
+        top: 0,
+        behavior: "instant",
+      });
+      main.current?.focus({
+        preventScroll: true,
+      });
+    };
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  useEffect(() => {
+    if (route !== "home") return;
+    refresh();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [route, refresh]);
+  const create = async (settings, quick = false) => {
+    if (creating.current) return;
+    creating.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const room = await api("/rooms", {
+        body: settings,
+      });
+      if (quick) {
+        const result = await api(`/rooms/${room.id}/join`, {
+          body: {
+            player_id: room.players.find((player) => !player.is_ai).id,
+          },
+        });
+        writeStorage(`session:${room.id}`, {
+          player_id: result.player_id,
+          token: result.token,
+        });
+      }
+      setRooms((current) => [room, ...current]);
+      window.location.hash = `room/${room.id}`;
+    } catch (err) {
+      setError(
+        err.status
+          ? err.message
+          : "サーバーにつながりませんでした。少し待って再試行してください。実験室は接続なしで使えます。",
+      );
+    } finally {
+      creating.current = false;
+      setBusy(false);
+    }
+  };
+  const roomId =
+    route.startsWith("room/") && /^[a-zA-Z0-9-]+$/.test(route.slice(5))
+      ? route.slice(5)
+      : null;
   return (
     <>
-      {screen === "welcome" && (
-        <Welcome
-          rooms={rooms}
-          onEnterRoom={handleEnterRoom}
-          onDeleteRoom={handleDeleteRoom}
-          onCreateRoom={() => setScreen("new")}
-          serverStatus={serverStatus}
-          onRetryConnection={() => {
-            setServerStatus("connecting");
-            fetch(`${apiBase}/rooms`)
-              .then(res => setServerStatus(res.ok ? "online" : "offline"))
-              .catch(() => setServerStatus("offline"));
-          }}
-        />
-      )}
-      {screen === "new" && (
-        <NewRoom 
-          onCreate={() => setScreen("welcome")}
-          onReturn={() => setScreen("welcome")}
-        />
-      )}
-      {screen === "lobby" && selectedRoom && (
-        <RoomLobby
-          room={selectedRoom}
-          onStart={handleSelectPlayer}
-          onSpectate={handleSpectate}
-          onGameOver={handleGameOver}
-          onDeleteRoom={(id) => { handleDeleteRoom(id); setScreen("welcome"); }}
-          onReturn={() => setScreen("welcome")}
-          onRenamePlayer={handleRenamePlayer}
-        />
-      )}
-      {screen === "player" && selectedRoom && (
-        <Player
-          room={selectedRoom}
-          currentPlayerId={selectedRoom.mode.player_id}
-          onEndTurn={(turnNumber) => { setLastTurnNumber(turnNumber); setScreen("waiting"); }}
-          onReturn={() => setScreen("welcome")}
-        />
-      )}
-      {screen === "waiting" && (
-        <Waiting
-          room={selectedRoom}
-          currentPlayerId={selectedRoom.mode.player_id}
-          onNextTurn={handleNextTurn}
-          onGameOver={handleGameOver}
-          onReturn={() => setScreen("welcome")}
-          turnNumber={lastTurnNumber}
-        />
-      )}
-      {screen === "spectator" && selectedRoom && (
-        <Spectator
-          room={selectedRoom}
-          onGameOver={handleGameOver}
-          onReturn={() => setScreen("welcome")}
-        />
-      )}
-      {screen === "trophy" && selectedRoom && (
-        <Trophy
-          room={selectedRoom}
-          onRestart={() => {
-            setScreen("welcome");
-            setSelectedRoom(null);
-          }}
-        />
-      )}
+      <a
+        href="#main"
+        className="skip-link"
+        onClick={(event) => {
+          event.preventDefault();
+          main.current?.focus();
+        }}
+      >
+        {t("本文へ移動")}
+      </a>
+      <header className="site-header">
+        <div className="header-inner">
+          <a
+            href="#home"
+            className="brand"
+            aria-label={t("Markovian Town ホーム")}
+          >
+            <span className="brand-mark">
+              <svg
+                width="30"
+                height="30"
+                viewBox="0 0 30 30"
+                aria-hidden="true"
+              >
+                <path
+                  d="m7 21 8-14 8 14ZM7 21h16"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+                <circle cx="15" cy="7" r="4" fill="#d1ec9c" />
+                <circle cx="7" cy="21" r="4" fill="#e98e63" />
+                <circle cx="23" cy="21" r="4" fill="#f4f3e8" />
+              </svg>
+            </span>
+            <span>
+              Markovian
+              <span className="brand-town">
+                Town<span className="brand-dot">.</span>
+              </span>
+            </span>
+          </a>
+          <nav className="main-nav" aria-label={t("メインメニュー")}>
+            <a
+              className={
+                route === "home" || route === "new" || roomId ? "active" : ""
+              }
+              href="#home"
+            >
+              <Icon name="play" size={16} />
+              <span>{t("遊ぶ")}</span>
+            </a>
+            <a className={route === "lab" ? "active" : ""} href="#lab">
+              <Icon name="lab" size={17} />
+              <span>{t("実験室")}</span>
+            </a>
+            <a className={route === "guide" ? "active" : ""} href="#guide">
+              <Icon name="book" size={17} />
+              <span>{t("学ぶ")}</span>
+            </a>
+          </nav>
+          <div className="language-switch" role="group" aria-label={t("言語")}>
+            <button
+              type="button"
+              lang="ja"
+              aria-pressed={language === "ja"}
+              onClick={() => setLanguage("ja")}
+            >
+              日本語
+            </button>
+            <button
+              type="button"
+              lang="en"
+              aria-pressed={language === "en"}
+              onClick={() => setLanguage("en")}
+            >
+              English
+            </button>
+          </div>
+        </div>
+      </header>
+      <main id="main" ref={main} tabIndex={-1}>
+        {error && (
+          <div className="page global-error">
+            <div className="error-banner" role="alert">
+              <span>{t(error)}</span>
+              <button
+                className="icon-button"
+                aria-label={t("エラーを閉じる")}
+                onClick={() => setError("")}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+        <Suspense
+          fallback={
+            <div className="page loading-page" role="status">
+              <div className="loading-orbit" />
+              {t("画面を準備しています…")}
+            </div>
+          }
+        >
+          {roomId ? (
+            <GameRoom key={roomId} id={roomId} />
+          ) : route === "new" ? (
+            <RoomForm
+              key={preset}
+              presetId={preset}
+              busy={busy}
+              onCreate={create}
+            />
+          ) : route === "lab" ? (
+            <Laboratory />
+          ) : route === "guide" ? (
+            <Guide />
+          ) : (
+            <Home
+              rooms={rooms}
+              serverStatus={status}
+              refresh={refresh}
+              busy={busy}
+              onPreset={(id) => {
+                setPreset(id);
+                window.location.hash = "new";
+              }}
+              onQuickStart={() =>
+                create(presetPayload(PRESETS[0], t("はじめての街")), true)
+              }
+            />
+          )}
+        </Suspense>
+      </main>
+      <footer className="site-footer">
+        <a href="#home">Markovian Town.</a>
+        <span>{t("つながりの中に、数学を見つけよう。")}</span>
+        <a
+          href="https://github.com/shizuo-kaji/markov-game"
+          target="_blank"
+          rel="noreferrer"
+        >
+          About / GitHub ↗
+        </a>
+      </footer>
     </>
   );
 }
