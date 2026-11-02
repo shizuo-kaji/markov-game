@@ -13,6 +13,14 @@ def _build_handler(path: Path) -> RotatingFileHandler:
 
 _logger_cache: dict[str, logging.Logger] = {}
 
+
+def close_room_logger(room_id: str):
+    logger = _logger_cache.pop(room_id, None)
+    if logger:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
+
 def get_room_logger(room_id: str) -> logging.Logger:
     """Return a per-room logger, creating it (once) if needed."""
     if room_id not in _logger_cache:

@@ -19,7 +19,6 @@ export default function EdgeEditor({
   budget,
   alpha = 1,
   disabled = false,
-  experiment = false,
 }) {
   const { t } = useI18n();
   const source = Math.max(
@@ -105,9 +104,7 @@ export default function EdgeEditor({
         </label>
       </div>
       <div className="weight-control">
-        <span className="muted">
-          {experiment ? t("この辺の重み") : t("この辺をどう変える？")}
-        </span>
+        <span className="muted">{t("この辺の重み")}</span>
         <div className="weight-stepper">
           <button
             className="button"

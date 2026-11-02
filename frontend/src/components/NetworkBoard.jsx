@@ -17,11 +17,11 @@ function layout(n) {
 }
 function edgeGeometry(a, b, loop = false, trim = true) {
   if (loop) {
-    const direction = a.y < 235 ? -1 : 1;
+    const direction = a.x < 350 ? -1 : 1;
     return {
-      path: `M ${a.x - 18} ${a.y + direction * 18} C ${a.x - 75} ${a.y + direction * 100}, ${a.x + 75} ${a.y + direction * 100}, ${a.x + 18} ${a.y + direction * 18}`,
-      x: a.x,
-      y: a.y + direction * 79,
+      path: `M ${a.x + direction * 40} ${a.y - 26} C ${a.x + direction * 110} ${a.y - 75}, ${a.x + direction * 110} ${a.y + 75}, ${a.x + direction * 40} ${a.y + 26}`,
+      x: a.x + direction * 88,
+      y: a.y,
     };
   }
   const dx = b.x - a.x,
@@ -29,7 +29,7 @@ function edgeGeometry(a, b, loop = false, trim = true) {
     length = Math.hypot(dx, dy) || 1;
   const nx = -dy / length,
     ny = dx / length,
-    margin = trim ? 33 : 0;
+    margin = trim ? 46 : 0;
   const start = {
     x: a.x + (dx / length) * margin,
     y: a.y + (dy / length) * margin,
@@ -57,6 +57,7 @@ export default function NetworkBoard({
   selection,
   onSelect,
   distribution,
+  targetDistribution,
   changes = [],
   particles = [],
   motionKey = 0,
@@ -108,7 +109,7 @@ export default function NetworkBoard({
       current.map((position, i) =>
         i === drag.current.index
           ? {
-              x: Math.min(625, Math.max(75, point.x)),
+              x: Math.min(590, Math.max(110, point.x)),
               y: Math.min(365, Math.max(105, point.y)),
             }
           : position,
@@ -130,7 +131,7 @@ export default function NetworkBoard({
       );
       if (chosenSource && chosenSource !== source.id && !selected && !change)
         return;
-      if (matrix[i][j] === 0 && !selected && !change) return;
+      if (compact && matrix[i][j] === 0 && !selected && !change) return;
       const geometry = edgeGeometry(positions[i], positions[j], i === j);
       edges.push({
         source,
@@ -143,7 +144,25 @@ export default function NetworkBoard({
       });
     }),
   );
-  edges.sort((a, b) => Number(a.selected) - Number(b.selected));
+  // Keep hit targets in a stable DOM order: moving a hovered edge loses its click.
+  const edgeEvents = (source, target) => ({
+    onMouseEnter: () => setHover({ source: source.id, target: target.id }),
+    onMouseLeave: () => setHover(null),
+    onFocus: () => setHover({ source: source.id, target: target.id }),
+    onBlur: () => setHover(null),
+    onPointerDown: (event) => {
+      if (event.button === 0) choose(source.id, target.id);
+    },
+    onClick: () => choose(source.id, target.id),
+    onKeyDown: (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        choose(source.id, target.id);
+      }
+    },
+  });
+  const edgeClass = (i, j, selected) =>
+    `graph-edge ${selected ? "is-selected" : ""} ${matrix[i][j] === 0 ? "is-zero" : ""}`;
   return (
     <div className={`network ${compact ? "compact-network" : ""}`}>
       <svg
@@ -188,10 +207,18 @@ export default function NetworkBoard({
           </marker>
         </defs>
         <rect width="700" height="470" fill={`url(#${id}-grid)`} />
-        {edges.map(({ source, target, i, j, selected, geometry, change }) => (
+        {edges.map(({ source, target, i, j, selected, geometry }) => (
           <g
             key={`${i}-${j}`}
-            className={`graph-edge ${selected ? "is-selected" : ""}`}
+            className={edgeClass(i, j, selected)}
+            data-source={source.id}
+            data-target={target.id}
+            aria-pressed={
+              onSelect
+                ? selection?.source === source.id &&
+                  selection?.target === target.id
+                : undefined
+            }
             role={onSelect ? "button" : undefined}
             tabIndex={onSelect && !compact ? 0 : undefined}
             aria-label={t("{0}から{1}、重み{2}、移動確率{3}", [
@@ -200,27 +227,7 @@ export default function NetworkBoard({
               matrix[i][j],
               percent(transition?.[i]?.[j] || 0),
             ])}
-            onMouseEnter={() =>
-              setHover({
-                source: source.id,
-                target: target.id,
-              })
-            }
-            onMouseLeave={() => setHover(null)}
-            onFocus={() =>
-              setHover({
-                source: source.id,
-                target: target.id,
-              })
-            }
-            onBlur={() => setHover(null)}
-            onClick={() => choose(source.id, target.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                choose(source.id, target.id);
-              }
-            }}
+            {...edgeEvents(source, target)}
           >
             <path
               className="edge-hit"
@@ -242,6 +249,16 @@ export default function NetworkBoard({
               strokeDasharray={matrix[i][j] === 0 ? "5 4" : undefined}
               markerEnd={`url(#${id}-${selected ? "active" : "arrow"})`}
             />
+          </g>
+        ))}
+        {/* Labels sit above every hit path, so another edge cannot intercept a label click. */}
+        {edges.map(({ source, target, i, j, selected, geometry, change }) => (
+          <g
+            key={`label-${i}-${j}`}
+            className={edgeClass(i, j, selected)}
+            aria-hidden="true"
+            {...edgeEvents(source, target)}
+          >
             <rect
               className="edge-label-bg"
               x={geometry.x - 14}
@@ -351,6 +368,36 @@ export default function NetworkBoard({
               stroke={origin === node.id ? "#176b58" : COLORS[i]}
               strokeWidth={origin === node.id ? 4 : 1.5}
             />
+            {distribution && (
+              <>
+                <circle
+                  r="39"
+                  fill="none"
+                  stroke={COLORS[i]}
+                  strokeOpacity=".15"
+                  strokeWidth="5"
+                />
+                <circle
+                  className="node-distribution-arc"
+                  r="39"
+                  fill="none"
+                  stroke={COLORS[i]}
+                  strokeWidth="5"
+                  pathLength="1"
+                  strokeDasharray={`${distribution[i]} 1`}
+                  transform="rotate(-90)"
+                />
+                {targetDistribution && (
+                  <path
+                    className="node-target-mark"
+                    d="M0 -34V-44"
+                    stroke="#263f35"
+                    strokeWidth="2.5"
+                    transform={`rotate(${targetDistribution[i] * 360})`}
+                  />
+                )}
+              </>
+            )}
             <circle r="27" fill={COLORS[i]} fillOpacity=".15" />
             {node.kind === "player" ? (
               <g stroke={COLORS[i]} fill="none" strokeWidth="2">
@@ -384,20 +431,29 @@ export default function NetworkBoard({
               <g>
                 <rect
                   x="-26"
-                  y="-49"
+                  y="-66"
                   width="52"
                   height="23"
                   rx="11"
                   fill={COLORS[i]}
                 />
                 <text
-                  y="-33"
+                  y="-50"
                   textAnchor="middle"
                   className="node-share"
                   fill="white"
                 >
                   {percent(distribution[i])}
                 </text>
+                {targetDistribution && (
+                  <text
+                    y="83"
+                    textAnchor="middle"
+                    className="node-target-share"
+                  >
+                    π {percent(targetDistribution[i])}
+                  </text>
+                )}
               </g>
             )}
           </g>
@@ -409,7 +465,7 @@ export default function NetworkBoard({
             ? t("次に、行き先を選択。同じ点なら自己ループ。")
             : nodes.length > 6
               ? t("点が多いため、選択した出発点の辺を表示しています。")
-              : t("矢印で向き、数字で重み。点をドラッグして配置できます。")}
+              : t("矢印・数字をクリックして選択。破線は重み0。")}
         </div>
       )}
     </div>

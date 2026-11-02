@@ -3,7 +3,9 @@ import asyncio
 import copy
 import os
 import secrets
+import time
 import uuid
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Annotated
 
@@ -13,16 +15,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 try:
-    from .logging_conf import get_room_logger
+    from .logging_conf import get_room_logger, close_room_logger
 except ImportError:
-    from logging_conf import get_room_logger
+    from logging_conf import get_room_logger, close_room_logger
 
-app = FastAPI(title="Markovian Town", version="2.0")
+
+@asynccontextmanager
+async def lifespan(app):
+    async def cleanup():
+        while True:
+            await asyncio.sleep(30)
+            await prune_rooms()
+    task = asyncio.create_task(cleanup())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="Markovian Town", version="2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.environ.get("FRONTEND_URL", "*")],
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Player-Token"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "X-Player-Token", "X-Room-Token"],
 )
 EPSILON = 0.01
 rooms: dict[str, dict] = {}
@@ -61,6 +79,7 @@ class RoomCreate(StrictModel):
     points_per_round_K: int = Field(default=3, ge=1, le=20, strict=True)
     max_turns_S: int = Field(default=5, ge=1, le=12, strict=True)
     ai_player_positions: list[int] = Field(default_factory=list)
+    idle_timeout_minutes: int = Field(default=60, ge=0, le=1440, strict=True)
 
     @model_validator(mode="after")
     def check_settings(self):
@@ -95,8 +114,52 @@ class Submission(StrictModel):
 
 def get_room(room_id):
     if room_id not in rooms:
-        raise HTTPException(404, "ルームが見つかりません。サーバー再起動で消えた可能性があります。")
+        raise HTTPException(404, "ルームが見つかりません。削除されたか、サーバーが再起動した可能性があります。")
     return rooms[room_id]
+
+
+def touch(room):
+    room["_last_activity_at"] = time.monotonic()
+
+
+def expired(room):
+    timeout = room["settings"]["idle_timeout_minutes"]
+    return (room["name"] != "__warmup__" and timeout > 0
+            and time.monotonic() - room["_last_activity_at"] >= timeout * 60)
+
+
+def detach_room(room_id):
+    rooms.pop(room_id, None)
+    locks.pop(room_id, None)
+    close_room_logger(room_id)
+    return connections.pop(room_id, set())
+
+
+async def notify_removed(sockets, reason):
+    async def send(socket):
+        try:
+            await asyncio.wait_for(socket.send_json({"type": "room_deleted", "reason": reason}), timeout=3)
+            await asyncio.wait_for(socket.close(code=4004), timeout=3)
+        except (WebSocketDisconnect, RuntimeError, OSError, asyncio.TimeoutError):
+            pass
+    await asyncio.gather(*(send(socket) for socket in sockets))
+
+
+async def prune_rooms():
+    notifications = []
+    for room_id, room in list(rooms.items()):
+        if not expired(room):
+            continue
+        lock = locks.get(room_id)
+        if lock is None:
+            continue
+        async with lock:
+            current = rooms.get(room_id)
+            if current is None or not expired(current):
+                continue
+            sockets = detach_room(room_id)
+        notifications.append(notify_removed(sockets, "expired"))
+    await asyncio.gather(*notifications)
 
 
 def snapshot(room):
@@ -121,7 +184,7 @@ async def broadcast(room_id, payload):
     async def send(socket):
         try:
             await asyncio.wait_for(socket.send_json(payload), timeout=3)
-        except (RuntimeError, OSError, asyncio.TimeoutError):
+        except (WebSocketDisconnect, RuntimeError, OSError, asyncio.TimeoutError):
             connections.get(room_id, set()).discard(socket)
     await asyncio.gather(*(send(socket) for socket in list(connections.get(room_id, set()))))
 
@@ -197,12 +260,14 @@ def health():
 
 
 @app.get("/rooms")
-def list_rooms():
+async def list_rooms():
+    await prune_rooms()
     return [room_summary(room) for room in reversed(list(rooms.values())) if room["name"] != "__warmup__"]
 
 
 @app.post("/rooms", status_code=201)
-def create_room(settings: RoomCreate):
+async def create_room(settings: RoomCreate):
+    await prune_rooms()
     if settings.name == "__warmup__":
         existing = next((r for r in rooms.values() if r["name"] == "__warmup__"), None)
         if existing:
@@ -219,25 +284,57 @@ def create_room(settings: RoomCreate):
     room_id = str(uuid.uuid4())
     room = {"id": room_id, "name": settings.name, "settings": settings.model_dump(exclude={"name"}),
             "nodes": nodes, "matrix": weights, "round": 1, "status": "playing", "revision": 0,
-            "epsilon": EPSILON, "history": [], "_tokens": {}, "_pending": {}, "_receipts": {}}
+            "epsilon": EPSILON, "history": [], "_tokens": {}, "_pending": {}, "_receipts": {},
+            "_owner_token": secrets.token_urlsafe(24), "_last_activity_at": time.monotonic()}
     update_scores(room)
     room["history"].append({"round": 0, "matrix": copy.deepcopy(weights), "scores": list(room["scores"]),
                             "changes": [], "moves": []})
     rooms[room_id] = room
     locks[room_id] = asyncio.Lock()
-    return snapshot(room)
+    return {**snapshot(room), "owner_token": room["_owner_token"]}
 
 
 @app.get("/rooms/{room_id}")
-def read_room(room_id: str):
+async def read_room(room_id: str):
+    await prune_rooms()
     return snapshot(get_room(room_id))
+
+
+@app.delete("/rooms/{room_id}")
+async def delete_room(room_id: str, x_room_token: Annotated[str | None, Header()] = None):
+    get_room(room_id)
+    async with locks[room_id]:
+        room = get_room(room_id)
+        if not secrets.compare_digest(room["_owner_token"], x_room_token or ""):
+            raise HTTPException(403, "ルームを削除できるのは作成者だけです。")
+        sockets = detach_room(room_id)
+    await notify_removed(sockets, "deleted")
+    return {"deleted": True}
+
+
+@app.post("/rooms/{room_id}/activity")
+async def record_activity(room_id: str, x_player_token: Annotated[str | None, Header()] = None,
+                          x_room_token: Annotated[str | None, Header()] = None):
+    await prune_rooms()
+    get_room(room_id)
+    async with locks[room_id]:
+        room = get_room(room_id)
+        is_owner = secrets.compare_digest(room["_owner_token"], x_room_token or "")
+        is_player = any(secrets.compare_digest(token, x_player_token or "")
+                        for token in room["_tokens"].values())
+        if not (is_owner or is_player):
+            raise HTTPException(403, "参加情報がありません。ロビーから参加し直してください。")
+        touch(room)
+    return {"active": True}
 
 
 @app.post("/rooms/{room_id}/join")
 async def join_room(room_id: str, request: JoinRequest,
                     x_player_token: Annotated[str | None, Header()] = None):
-    room = get_room(room_id)
+    await prune_rooms()
+    get_room(room_id)
     async with locks[room_id]:
+        room = get_room(room_id)
         if room["status"] == "finished":
             raise HTTPException(409, "終了したゲームです。結果を見たり、新しいルームを作ったりできます。")
         node = next((p for p in room["nodes"] if p["id"] == request.player_id and p["kind"] == "player"), None)
@@ -252,6 +349,7 @@ async def join_room(room_id: str, request: JoinRequest,
             node["name"] = request.name.strip()
             node.pop("name_key", None)
         room["revision"] += 1
+        touch(room)
         public = snapshot(room)
     await broadcast(room_id, {"type": "room", "room": public})
     return {"token": token, "player_id": node["id"], "room": public}
@@ -260,8 +358,10 @@ async def join_room(room_id: str, request: JoinRequest,
 @app.post("/rooms/{room_id}/submit")
 async def submit(room_id: str, request: Submission,
                  x_player_token: Annotated[str | None, Header()] = None):
-    room = get_room(room_id)
+    await prune_rooms()
+    get_room(room_id)
     async with locks[room_id]:
+        room = get_room(room_id)
         player_id = next((pid for pid, token in room["_tokens"].items()
                           if secrets.compare_digest(token, x_player_token or "")), None)
         if not player_id:
@@ -295,6 +395,7 @@ async def submit(room_id: str, request: Submission,
         if all(pid in room["_pending"] for pid in humans):
             resolve_round(room)
         room["revision"] += 1
+        touch(room)
         public = snapshot(room)
     await broadcast(room_id, {"type": "room", "room": public})
     return public
@@ -302,10 +403,14 @@ async def submit(room_id: str, request: Submission,
 
 @app.websocket("/ws/{room_id}")
 async def websocket_room(websocket: WebSocket, room_id: str):
+    await prune_rooms()
     if room_id not in rooms:
         await websocket.close(code=4004)
         return
     await websocket.accept()
+    if room_id not in rooms:
+        await websocket.close(code=4004)
+        return
     connections.setdefault(room_id, set()).add(websocket)
     try:
         await websocket.send_json({"type": "room", "room": snapshot(rooms[room_id])})

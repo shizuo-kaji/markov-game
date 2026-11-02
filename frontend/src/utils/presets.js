@@ -41,6 +41,7 @@ export function presetPayload(preset, name = preset.title) {
     points_per_round_K: preset.k,
     max_turns_S: preset.s,
     ai_player_positions: preset.ai,
+    idle_timeout_minutes: 60,
   };
 }
 export const LAB_NODES = [

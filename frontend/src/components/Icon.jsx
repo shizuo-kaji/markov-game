@@ -8,6 +8,7 @@ export default function Icon({ name = "arrow", size = 20, ...props }) {
     reset: "M3 10a9 9 0 1 1 1.5 7M3 4v6h6",
     plus: "M12 5v14M5 12h14",
     close: "m6 6 12 12M18 6 6 18",
+    trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
     check: "m5 12 4 4L19 6",
     book: "M12 5v15M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Z",
     lab: "M9 3h6M10 3v7L4 20h16l-6-10V3M7 15h10",

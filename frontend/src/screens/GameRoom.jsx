@@ -6,6 +6,7 @@ import FlowLab from "../components/FlowLab.jsx";
 import NetworkBoard from "../components/NetworkBoard.jsx";
 import EdgeEditor from "../components/EdgeEditor.jsx";
 import Icon from "../components/Icon.jsx";
+import DeleteRoom from "../components/DeleteRoom.jsx";
 import { api, readStorage, writeStorage } from "../utils/api.js";
 import { applyMoves, COLORS, percent, signed } from "../utils/markov.js";
 function Scoreboard({ room, playerId }) {
@@ -328,12 +329,12 @@ function RoundEditor({ room, session, updateRoom }) {
     <div className="game-layout">
       <div className="play-board-column">
         <FlowLab
-          key={preview ? JSON.stringify(projected) : "actual"}
+          mode="planning"
           nodes={room.nodes}
           matrix={preview ? projected : room.matrix}
           selection={selection}
           onSelect={setSelection}
-          title={preview ? t("自分の変更だけを試す仮の街") : t("いまの街")}
+          title={preview ? t("変更後の予測") : t("いまの街")}
         />
         <label className="preview-toggle">
           <input
@@ -347,11 +348,7 @@ function RoundEditor({ room, session, updateRoom }) {
       </div>
       <aside className="editor-panel">
         <div className="editor-heading">
-          <span className="eyebrow">YOUR NEXT MOVE</span>
-          <h2>{t("次の流れをつくろう")}</h2>
-          <p>
-            {t("入ってくる道？ 出ていく道？ 小さな変更が、街全体に響きます。")}
-          </p>
+          <h2>{t("重みを変更")}</h2>
         </div>
         <div className="budget">
           <span>{t("使えるポイント")}</span>
@@ -398,11 +395,7 @@ function RoundEditor({ room, session, updateRoom }) {
           <Icon name="check" size={18} />
         </button>
         <p className="fine-print">
-          {t("提出後は変更できません。")}
-          {budget - spent > 0
-            ? t("残り{0}ポイントは持ち越されません。", [budget - spent])
-            : ""}
-          {t("全員の提出後に同時に反映します。")}
+          {t("全員の提出後に反映。残りポイントは持ち越せません。")}
         </p>
         <ReadyList room={room} playerId={session.player_id} />
       </aside>
@@ -547,15 +540,7 @@ function Review({ room, round, onContinue }) {
           <Icon name="chart" />
         </span>
         <div>
-          <span className="eyebrow">
-            ROUND {entry.round} / OBSERVE & REFLECT
-          </span>
-          <h1>{t("道が変わった。人の流れは？")}</h1>
-          <p>
-            {t(
-              "変更を見て、再生で確かめよう。準備ができるまで、ゆっくり観察できます。",
-            )}
-          </p>
+          <h1>{t("ラウンド {0} の結果", [entry.round])}</h1>
         </div>
         <button className="button primary" onClick={onContinue}>
           {room.status === "finished" ? t("結果を見る") : t("次の操作へ")}
@@ -565,6 +550,8 @@ function Review({ room, round, onContinue }) {
       <div className="game-layout">
         <FlowLab
           key={entry.round}
+          mode="transition"
+          initialDistribution={previous.scores}
           nodes={room.nodes}
           matrix={entry.matrix}
           changes={entry.changes}
@@ -574,8 +561,7 @@ function Review({ room, round, onContinue }) {
           title={t("ラウンド {0} の街", [entry.round])}
         />
         <aside className="editor-panel">
-          <span className="eyebrow">WHAT CHANGED?</span>
-          <h2>{t("みんなの手の結果")}</h2>
+          <h2>{t("重みの変化")}</h2>
           <div className="changes-list">
             {entry.changes.length ? (
               entry.changes.map((change) => (
@@ -613,7 +599,7 @@ function Review({ room, round, onContinue }) {
               <p className="muted">{t("辺の重みに変化はありませんでした。")}</p>
             )}
           </div>
-          <h3>{t("得点はどう変わった？")}</h3>
+          <h3>{t("得点の変化")}</h3>
           <div className="review-scores">
             {room.players.map((player) => {
               const i = room.nodes.findIndex((node) => node.id === player.id);
@@ -648,20 +634,6 @@ function Review({ room, round, onContinue }) {
               </p>
             ))}
           </details>
-          <div className="callout">
-            <Icon name="book" size={18} />
-            <p>
-              <strong>{t("振り返ってみよう")}</strong>
-              <br />
-              {t(
-                "予想と合っていた？ 人が集まっている場所からの道は、どれくらい効いただろう？",
-              )}
-            </p>
-          </div>
-          <button className="button primary full" onClick={onContinue}>
-            {room.status === "finished" ? t("結果を見る") : t("次の操作へ")}
-            <Icon name="arrow" size={18} />
-          </button>
         </aside>
       </div>
     </>
@@ -781,7 +753,14 @@ function Results({ room, exportRoom, onReview }) {
 }
 export default function GameRoom({ id }) {
   const { t } = useI18n();
-  const { room: rawRoom, updateRoom, connection, error } = useRoom(id);
+  const {
+    room: rawRoom,
+    updateRoom,
+    connection,
+    error,
+    removed,
+    forgetRoom,
+  } = useRoom(id);
   const room = useMemo(() => localizeRoom(rawRoom, t), [rawRoom, t]);
   const [session, setSession] = useState(() => readStorage(`session:${id}`));
   const [spectating, setSpectating] = useState(false);
@@ -789,6 +768,23 @@ export default function GameRoom({ id }) {
     readStorage(`seen:${id}`, 0),
   );
   const [historyRound, setHistoryRound] = useState(null);
+  const lastActivity = useRef(0);
+  const recordActivity = () => {
+    const ownerToken = readStorage(`owner:${id}`);
+    if (
+      (!session?.token && !ownerToken) ||
+      Date.now() - lastActivity.current < 15000
+    )
+      return;
+    lastActivity.current = Date.now();
+    api(`/rooms/${id}/activity`, {
+      method: "POST",
+      token: session?.token,
+      ownerToken,
+    }).catch((err) => {
+      if (err.status === 404) forgetRoom(err.message);
+    });
+  };
   const join = async (playerId, name) => {
     const result = await api(`/rooms/${id}/join`, {
       token: session?.token,
@@ -837,8 +833,14 @@ export default function GameRoom({ id }) {
   if (!room)
     return (
       <div className="page loading-page">
-        <div className="loading-orbit" />
-        <h1>{error ? t("接続を確認してください") : t("街を開いています…")}</h1>
+        {!removed && <div className="loading-orbit" />}
+        <h1>
+          {removed
+            ? t("ルームは終了しました")
+            : error
+              ? t("接続を確認してください")
+              : t("街を開いています…")}
+        </h1>
         <p role="status">
           {t(error) || t("サーバーの起動には1分ほどかかる場合があります。")}
         </p>
@@ -853,7 +855,12 @@ export default function GameRoom({ id }) {
     setHistoryRound(null);
   };
   return (
-    <div className="page game-page">
+    <div
+      className="page game-page"
+      onPointerDownCapture={recordActivity}
+      onKeyDownCapture={recordActivity}
+      onWheelCapture={recordActivity}
+    >
       <div className="room-toolbar">
         <a className="back-link" href="#home">
           <Icon name="back" size={16} />
@@ -886,6 +893,12 @@ export default function GameRoom({ id }) {
             </select>
           </label>
         )}
+        <DeleteRoom
+          room={room}
+          onDeleted={() => {
+            window.location.hash = "home";
+          }}
+        />
       </div>
       {error && (
         <div className="error-banner" role="alert">
@@ -916,19 +929,12 @@ export default function GameRoom({ id }) {
         <>
           <div className="page-heading game-heading">
             <div>
-              <span className="eyebrow">
-                {spectating
-                  ? "WATCH THE TOWN"
-                  : waiting
-                    ? "MOVES SEALED"
-                    : "PLAN · CHANGE · OBSERVE"}
-              </span>
               <h1>
                 {spectating
-                  ? t("街の変化を観戦中")
+                  ? t("観戦中")
                   : waiting
-                    ? t("提出完了。みんなの手を待とう。")
-                    : t("あなたの一手で、流れが変わる。")}
+                    ? t("提出済み")
+                    : t("作戦を考える")}
               </h1>
             </div>
             <div className="round-counter">
@@ -951,33 +957,14 @@ export default function GameRoom({ id }) {
             <div className="game-layout">
               <FlowLab
                 key={room.round}
+                mode="planning"
                 nodes={room.nodes}
                 matrix={room.matrix}
                 title={t("現在の街を観察")}
               />
               <aside className="editor-panel">
-                <span className="eyebrow">
-                  {waiting ? "READY WHEN EVERYONE IS" : "SPECTATOR VIEW"}
-                </span>
-                <h2>
-                  {waiting
-                    ? t("みんなが提出すると、次へ。")
-                    : t("作戦を予想してみよう。")}
-                </h2>
-                <p className="muted">
-                  {t(
-                    "全員の手が揃ったら、自動で新しい街を表示します。観察画面は自分のペースで進められます。",
-                  )}
-                </p>
+                <h2>{t("提出状況")}</h2>
                 <ReadyList room={room} playerId={session?.player_id} />
-                <div className="callout">
-                  <Icon name="spark" />
-                  <p>
-                    {t(
-                      "同じ重みでも、出発点に人が多いほど大きな流れになります。どの道が重要そう？",
-                    )}
-                  </p>
-                </div>
                 <ShareRoom room={room} />
                 {spectating && (
                   <button

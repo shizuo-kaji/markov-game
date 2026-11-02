@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "../utils/api.js";
 
 export default function useRoom(id) {
   const [room, setRoom] = useState(null);
+  const [removed, setRemoved] = useState(false);
+  const unavailable = useRef(false);
   const [connection, setConnection] = useState("connecting");
   const [error, setError] = useState("");
   const updateRoom = useCallback((next) => {
+    if (unavailable.current) return;
     setRoom((previous) =>
       !previous || previous.id !== next.id || next.revision >= previous.revision
         ? next
@@ -13,8 +16,15 @@ export default function useRoom(id) {
     );
     setError("");
   }, []);
+  const forgetRoom = useCallback((message) => {
+    unavailable.current = true;
+    setRoom(null);
+    setRemoved(true);
+    setConnection("offline");
+    setError(message);
+  }, []);
   useEffect(() => {
-    if (!id) return;
+    if (!id || removed) return;
     let active = true,
       socket,
       reconnect,
@@ -23,8 +33,12 @@ export default function useRoom(id) {
       refreshing = false,
       lastMessage = Date.now();
     const controller = new AbortController();
+    const gone = (message) => {
+      active = false;
+      forgetRoom(message);
+    };
     const refresh = async () => {
-      if (refreshing) return;
+      if (refreshing || !active) return;
       refreshing = true;
       try {
         const next = await api(`/rooms/${id}`, {
@@ -35,12 +49,13 @@ export default function useRoom(id) {
         });
         if (active) updateRoom(next);
       } catch (err) {
-        if (active)
-          setError(
-            err.status === 404
-              ? err.message
-              : "接続を確認しています。操作内容はこの端末に保存されています。",
-          );
+        if (active) {
+          if (err.status === 404) gone(err.message);
+          else
+            setError(
+              "接続を確認しています。操作内容はこの端末に保存されています。",
+            );
+        }
       } finally {
         refreshing = false;
       }
@@ -61,6 +76,12 @@ export default function useRoom(id) {
         try {
           const message = JSON.parse(event.data);
           if (message.type === "room") updateRoom(message.room);
+          if (message.type === "room_deleted")
+            gone(
+              message.reason === "expired"
+                ? "無操作時間が過ぎたため、このルームは削除されました。"
+                : "作成者がこのルームを削除しました。",
+            );
         } catch {
           /* Ignore malformed network frames. */
         }
@@ -71,7 +92,7 @@ export default function useRoom(id) {
         if (!active) return;
         setConnection("reconnecting");
         if (event.code === 4004) {
-          setError(
+          gone(
             "このルームは見つかりません。ホームから新しく作成してください。",
           );
           return;
@@ -109,6 +130,13 @@ export default function useRoom(id) {
       socket?.close();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [id, updateRoom]);
-  return { room: room?.id === id ? room : null, updateRoom, connection, error };
+  }, [id, updateRoom, removed, forgetRoom]);
+  return {
+    room: room?.id === id ? room : null,
+    updateRoom,
+    connection,
+    error,
+    removed,
+    forgetRoom,
+  };
 }

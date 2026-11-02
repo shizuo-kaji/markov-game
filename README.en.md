@@ -22,6 +22,8 @@ Recommended settings: **2 players, 2 neutral places, 3 points per round and 5 ro
 
 Use **Custom room** to adjust the settings.
 
+Creators can delete their rooms from the room list or toolbar. Automatic deletion after inactivity is configurable when creating a room (default: 60 minutes; can be disabled).
+
 ## Rules
 
 The town consists of players’ shops and neutral public places. People follow directed paths. Among paths leaving the same place, higher weights make a path more likely to be chosen.
@@ -34,6 +36,8 @@ The town consists of players’ shops and neutral public places. People follow d
 You can undo changes before submitting. You may leave points unused, but they do not carry over. Changes to the same path are added together; a resulting negative weight is set to zero.
 
 After each round, review weight changes, score differences and the flow animation. The preview before submission includes only your own changes.
+
+The planning board shows the stationary distribution. Between rounds, it shows convergence from the previous distribution to the new one. Dashed, zero-weight edges are also selectable.
 
 ## Mathematical background
 
@@ -63,7 +67,7 @@ $$
 
 It is a **fixed point** of $x\mapsto xP$ and a left eigenvector of $P$ with eigenvalue 1. Since every entry of $P$ is positive, the stationary distribution is unique and every starting distribution converges to it.
 
-Your shop’s component $\pi_i$ is your score. Neutral places also have a share, so players’ scores alone do not sum to 100%. People keep moving even at stationarity. The 80 dots are a sample of random walkers; the bars show the calculated distribution.
+Your shop’s component $\pi_i$ is your score. Neutral places also have a share, so players’ scores alone do not sum to 100%. People keep moving even at stationarity. The 80 dots are a sample of random walkers; node arcs and percentages show the calculated distribution.
 
 ### PageRank
 
@@ -84,7 +88,7 @@ Through prediction, intervention, observation and explanation, the game aims to 
 | Concept                                                        | Experiment                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Weights, probabilities and the global effects of local changes | Increase one weight and compare the changes in probabilities and shop scores  |
-| Individual randomness and the overall distribution             | Compare fluctuating walker counts with the distribution bars                  |
+| Individual randomness and the overall distribution             | Compare fluctuating walker counts with the shares shown on nodes                  |
 | Convergence to stationarity                                    | Keep the board fixed and change only the starting distribution                |
 | Fixed points                                                   | Start from **Stationary distribution π** and take one step                    |
 | PageRank                                                       | Vary the jump probability and compare how people gather at a strong self-loop |

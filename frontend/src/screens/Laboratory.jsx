@@ -163,7 +163,6 @@ export default function Laboratory() {
             moves={moves}
             onChange={change}
             alpha={alpha}
-            experiment
           />
           <label className="field prediction-question">
             {t("あなたの店の割合は？")}

@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/useI18n.js";
 import { useMemo, useState } from "react";
 import NetworkBoard from "../components/NetworkBoard.jsx";
 import Icon from "../components/Icon.jsx";
+import DeleteRoom from "../components/DeleteRoom.jsx";
 import { PRESETS, LAB_NODES } from "../utils/presets.js";
 import {
   initialMatrix,
@@ -178,30 +179,33 @@ export default function Home({
           {rooms
             .filter((room) => room.name.includes(search))
             .map((room) => (
-              <a className="room-row" key={room.id} href={`#room/${room.id}`}>
-                <span className="room-symbol">
-                  <Icon name="people" />
-                </span>
-                <div>
-                  <strong>{room.name}</strong>
-                  <span>
-                    {t("{0}人 · 中立{1} · {2}pt / ラウンド", [
-                      room.settings.num_players_N,
-                      room.settings.num_non_player_nodes_M,
-                      room.settings.points_per_round_K,
-                    ])}
+              <div className="room-list-item" key={room.id}>
+                <a className="room-row" href={`#room/${room.id}`}>
+                  <span className="room-symbol">
+                    <Icon name="people" />
                   </span>
-                </div>
-                <span className="pill">
-                  {room.status === "finished"
-                    ? t("結果を見る")
-                    : t("ラウンド {0} / {1}", [
-                        room.round,
-                        room.settings.max_turns_S,
+                  <div>
+                    <strong>{room.name}</strong>
+                    <span>
+                      {t("{0}人 · 中立{1} · {2}pt / ラウンド", [
+                        room.settings.num_players_N,
+                        room.settings.num_non_player_nodes_M,
+                        room.settings.points_per_round_K,
                       ])}
-                </span>
-                <Icon name="arrow" size={18} />
-              </a>
+                    </span>
+                  </div>
+                  <span className="pill">
+                    {room.status === "finished"
+                      ? t("結果を見る")
+                      : t("ラウンド {0} / {1}", [
+                          room.round,
+                          room.settings.max_turns_S,
+                        ])}
+                  </span>
+                  <Icon name="arrow" size={18} />
+                </a>
+                <DeleteRoom room={room} onDeleted={refresh} />
+              </div>
             ))}
           {!rooms.filter((room) => room.name.includes(search)).length && (
             <div className="empty-state">

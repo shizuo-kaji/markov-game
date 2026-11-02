@@ -34,11 +34,7 @@ export default function RoomForm({ onCreate, busy, presetId = "solo" }) {
         <Icon name="back" size={16} />
         {t("ホームに戻る")}
       </a>
-      <span className="eyebrow">MAKE YOUR TOWN</span>
-      <h1>{t("どんな街で遊ぼう？")}</h1>
-      <p className="lead">
-        {t("はじめてなら、おすすめの設定でそのまま始められます。")}
-      </p>
+      <h1>{t("ルームを作成")}</h1>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -140,18 +136,9 @@ export default function RoomForm({ onCreate, busy, presetId = "solo" }) {
                 </label>
               ))}
             </div>
-            <div className="callout">
-              <Icon name="spark" />
-              <p>
-                <strong>
-                  {t("おすすめは、2人・中立2点・3ポイント・5ラウンド。")}
-                </strong>
-                <br />
-                {t(
-                  "辺の変化を追いやすく、少ない操作で結果を比較できます。今回の入門用設定です。",
-                )}
-              </p>
-            </div>
+            <p className="fine-print">
+              {t("おすすめは、2人・中立2点・3ポイント・5ラウンド。")}
+            </p>
             <div>
               <h3>{t("コンピューターに任せる席")}</h3>
               <p className="muted">
@@ -184,6 +171,25 @@ export default function RoomForm({ onCreate, busy, presetId = "solo" }) {
                 )}
               </div>
             </div>
+            <label className="field">
+              {t("無操作時の自動削除")}
+              <select
+                value={settings.idle_timeout_minutes}
+                onChange={(event) =>
+                  setValue("idle_timeout_minutes", Number(event.target.value))
+                }
+              >
+                <option value={0}>{t("削除しない")}</option>
+                {[15, 30, 60, 180].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {t("{0}分後", [minutes])}
+                  </option>
+                ))}
+              </select>
+              <span className="fine-print">
+                {t("参加者・作成者の最後の操作から計測します。")}
+              </span>
+            </label>
             {invalid && (
               <p role="alert" className="error-text">
                 {t(

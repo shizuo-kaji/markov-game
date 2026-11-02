@@ -84,9 +84,10 @@ export default function GameApp() {
     setBusy(true);
     setError("");
     try {
-      const room = await api("/rooms", {
+      const { owner_token, ...room } = await api("/rooms", {
         body: settings,
       });
+      writeStorage(`owner:${room.id}`, owner_token);
       if (quick) {
         const result = await api(`/rooms/${room.id}/join`, {
           body: {

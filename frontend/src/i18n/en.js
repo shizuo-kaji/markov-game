@@ -425,4 +425,53 @@ export default {
   "マルコフ連鎖を、遊んで学ぶ": "Learn Markov chains through play",
   "道を変え、人の流れを観察する。マルコフ連鎖・定常分布・PageRankを体験できるゲーム。":
     "Change paths and follow the flow. Explore Markov chains, stationary distributions and PageRank through play.",
+  "定常分布 π": "Stationary distribution π",
+  "割合 = 得点 · πP = π": "Share = score · πP = π",
+  "円弧：今の割合 / 目印：定常分布 π":
+    "Arc: current share / tick: stationary π",
+  "ほぼ定常 · 人は動き、割合は保たれる":
+    "Near stationary · people move, shares hold",
+  "xₜ₊₁ = xₜP → π": "xₜ₊₁ = xₜP → π",
+  定常分布を表示: "Show stationary distribution",
+  "初期分布・再生速度": "Starting distribution & speed",
+  初期分布: "Starting distribution",
+  前ラウンドの定常分布: "Previous round’s stationary distribution",
+  "割合は xₜ₊₁ = xₜP で計算。点は80人のランダムな移動を表します。":
+    "Shares follow xₜ₊₁ = xₜP. Dots show 80 sampled random walkers.",
+  "矢印・数字をクリックして選択。破線は重み0。":
+    "Click an arrow or weight to select. Dashed edges have weight 0.",
+  ルームを作成: "Create a room",
+  無操作時の自動削除: "Delete inactive room after",
+  削除しない: "Never",
+  "{0}分後": "{0} minutes",
+  "参加者・作成者の最後の操作から計測します。":
+    "Measured from the last action by a player or the creator.",
+  "{0}を削除": "Delete {0}",
+  削除: "Delete",
+  "「{0}」を削除しますか？": "Delete “{0}”?",
+  "参加中の人も退出します。": "This closes the room for everyone.",
+  キャンセル: "Cancel",
+  "削除中…": "Deleting…",
+  ルームを削除: "Delete room",
+  "削除できませんでした。接続を確認して再試行してください。":
+    "Could not delete the room. Check your connection and try again.",
+  "ルームを削除できるのは作成者だけです。":
+    "Only the creator can delete this room.",
+  "無操作時間が過ぎたため、このルームは削除されました。":
+    "This room was deleted after a period of inactivity.",
+  "作成者がこのルームを削除しました。": "The creator deleted this room.",
+  変更後の予測: "Preview of your changes",
+  重みを変更: "Edit weights",
+  "全員の提出後に反映。残りポイントは持ち越せません。":
+    "Changes apply after everyone submits. Unused points do not carry over.",
+  "ラウンド {0} の結果": "Round {0} results",
+  重みの変化: "Weight changes",
+  得点の変化: "Score changes",
+  ルームは終了しました: "Room closed",
+  観戦中: "Spectating",
+  作戦を考える: "Plan your move",
+  提出状況: "Submissions",
+  "辺の +3 / −2 が重みの変化です。ラウンド間は前の分布から新しい定常分布への収束を表示し、作戦中は定常分布を表示します。得点は累積せず、最終ラウンドの割合で順位が決まります。公共施設の割合も含めて合計100%です。":
+    "Edge badges such as +3 / −2 show weight changes. Between rounds, the board converges from the previous distribution to the new stationary distribution; while planning, it shows the stationary distribution. Only the final round determines the ranking. Shares sum to 100% including neutral places.",
+  "ルームが見つかりません。削除されたか、サーバーが再起動した可能性があります。": "Room not found. It may have been deleted, or the server may have restarted.",
 };

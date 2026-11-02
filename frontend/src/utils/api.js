@@ -1,14 +1,18 @@
 export const API_BASE = (
   import.meta.env.VITE_APP_API_URL || "http://localhost:8000"
 ).replace(/\/$/, "");
-export async function api(path, { body, token, signal, ...options } = {}) {
+export async function api(
+  path,
+  { body, token, ownerToken, signal, method, ...options } = {},
+) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     signal: signal || AbortSignal.timeout(65000),
-    method: body === undefined ? "GET" : "POST",
+    method: method || (body === undefined ? "GET" : "POST"),
     headers: {
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       ...(token ? { "X-Player-Token": token } : {}),
+      ...(ownerToken ? { "X-Room-Token": ownerToken } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
